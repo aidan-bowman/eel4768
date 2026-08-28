@@ -1,0 +1,20 @@
+.data
+a:      .word 10, 9, 9, 4, 0
+        .word 0, 6, 6, 2, 2
+        .word 5, 9, 8, 4, 3
+        .word 7, 5, 5, 4, 3
+        .word 8, 10, 8, 5, 0
+gx:     .word -1, 0, 1
+        .word -2, 0, 2
+        .word -1, 0, 1
+gy:     .word 1, 2, 1
+        .word 0, 0, 0
+        .word -1, -2, -1
+c:      .word 0, 0, 0
+        .word 0, 0, 0
+        .word 0, 0, 0
+
+.text
+.globl main
+
+main:
