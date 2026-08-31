@@ -1,0 +1,14 @@
+.data
+a:  .word 1, 2, 5, 7
+    .word 3, 9, 2, 5
+    .word 1, 9, 8, 2
+    .word 4, 1, 6, 6
+b:  .word 3, 4, 9, 2
+    .word 1, 8, 7, 3
+    .word 8, 9, 1, 2
+    .word 6, 3, 7, 5
+c:  .word 0, 0, 0, 0
+    .word 0, 0, 0, 0
+    .word 0, 0, 0, 0
+    .word 0, 0, 0, 0
+
