@@ -1,4 +1,4 @@
-    ########################3
+    ########################
     # Generic Matrix Multiplication
     # multiply 4x4 matrices A and B into matrix C
     # written by AJ
@@ -21,91 +21,140 @@ c:  .word 0, 0, 0, 0
     .word 0, 0, 0, 0
 
 .text
-.globl main
+.global main
 
-main:
-    lui  t0, 0x10010        # Load data segment address
+main:    
+    addi sp, sp, -24
+    sw ra, 20(sp)
+    sw fp, 16(sp)
+    sw s1, 12(sp)
+    sw s2, 8(sp)
+    sw s3, 4(sp)
+    sw s4, 0(sp)
+    addi fp, sp, 20         # unsure this is the right number
 
-    # using s1, s2, s3, t0, t1, t2
+    # using s1, s2, s3, s4, a0, a1, t2
     # since we exit via syscall, we don't have to worry about
     # pushing saved registers on the stack! yippee
     
-    lui  s1, 0              # index i for C (increments by 4 since we know matrices are 4x4)
-    lui  s2, 0              # index j for C
+    addi s1, zero, 0        # index i for C (increments by 16 since we know matrices are 4x4)
+    addi s2, zero, 0        # index j for C (increments by 4 since we're 32bit)
+    lui  s4, 0x10010        # Load data segment address
 
-    # t0 used for desired address of B, then value from B
-    # t1 used for desired address of B, then value from B
+    # a0 used for desired address of A, then value from A
+    # a1 used for desired address of B, then value from B
 
     # s3 used for sum we're storing in C
     # t2 used for temporary values here and there
 
-L_loop:   
+main_loop:   
     # since we know k goes from 0-3, lets just hardcode all 4 values
     
     # k = 0
-    addi t0, t0, 0          # address = A_00
-    addi t0, s1, 0          # address = A_i0
-    lw   t0, 0(t0)          # load A_ik
+    add a0, s4, s1          # address = A_i0
+    lw   a0, 0(a0)          # load A_ik
     
-    addi t1, t0, 64         # address = B_00
-    addi t1, s2, 0          # address = B_0j
-    lw   t1, 0(t1)          # load B_kj
+    addi a1, s4, 64         # address = B_00
+    add a1, a1, s2          # address = B_0j
+    lw   a1, 0(a1)          # load B_kj
 
-    ### TODO: mult t0 and t1, s3 = t0 + t1
+    jal mult
+    addi s3, a0, 0
 
     # k = 1
-    addi t0, t0, 0          # address = A_00
-    addi t0, s1, 0          # address = A_i0
-    lw   t0, 1(t0)          # load A_ik
+    add a0, s4, s1          # address = A_i0
+    lw   a0, 4(a0)          # load A_ik
     
-    addi t1, t0, 64         # address = B_00
-    addi t1, s2, 0          # address = B_0j
-    lw   t1, 4(t1)          # load B_kj
+    addi a1, s4, 64         # address = B_00
+    add a1, a1, s2          # address = B_0j
+    lw   a1, 16(a1)          # load B_kj
 
-    ### TODO: mult t0 and t1, s3 = t0 + t1 + s3
+    jal mult
+    add s3, s3, a0
 
     # k = 2
-    addi t0, t0, 0          # address = A_00
-    addi t0, s1, 0          # address = A_i0
-    lw   t0, 2(t0)          # load A_ik
+    add a0, s4, s1          # address = A_i0
+    lw   a0, 8(a0)          # load A_ik
     
-    addi t1, t0, 64         # address = B_00
-    addi t1, s2, 0          # address = B_0j
-    lw   t1, 8(t1)          # load B_kj
+    addi a1, s4, 64         # address = B_00
+    add a1, a1, s2          # address = B_0j
+    lw   a1, 32(a1)          # load B_kj
 
-    ### TODO: mult t0 and t1, s3 = t0 + t1 + s3
+    jal mult
+    add s3, s3, a0
 
     # k = 3
-    addi t0, t0, 0          # address = A_00
-    addi t0, s1, 0          # address = A_i0
-    lw   t0, 3(t0)          # load A_ik
+    add a0, s4, s1          # address = A_i0
+    lw   a0, 12(a0)          # load A_ik
     
-    addi t1, t0, 64         # address = B_00
-    addi t1, s2, 0          # address = B_0j
-    lw   t1, 12(t1)         # load B_kj
+    addi a1, s4, 64         # address = B_00
+    add a1, a1, s2          # address = B_0j
+    lw   a1, 48(a1)         # load B_kj
 
-    ### TODO: mult t0 and t1, s3 = t0 + t1 + s3
+    jal mult
+    add s3, s3, a0
 
     # store sum into C_ij
-    add  t2, s1, s2         # address = ij (not C_ij!!)
+    add  t2, s4, s1         # address = i  (not C_ij!!)
+    add  t2, t2, s2         # address = ij (not C_ij!!)
     sw   s3, 128(t2)        # store C_ij
 
 
-L_loopreturn:
+main_loopreturn:
     # remember, s1 is i, s2 is j
-    addi s2, s2, 1          # j++
-    addi t2, zero, 4        $ 4 is our comparator for both checks
+    addi s2, s2, 4          # j += 4
 
-    # if (j == 4) { j = 0, i++ }
-    bne s2, t2, L_checki
+    # if (j == 16) { j = 0, i += 16 }
+    addi t2, zero, 16       # 4 steps * 4 bitwidth
+    bne s2, t2, main_checki
     addi s2, zero, 0
-    addi s1, s1 1
+    addi s1, s1, 16
     
-L_checki:
-    # if (i != 4) { goto loop }
-    bne s1, t2, L_loop
+main_checki:
+    # if (i != 64) { goto loop }
+    addi t2, zero, 64       # 4 steps * 4 columns * 4 bitwidth
+    bne s1, t2, main_loop
 
-done:
+main_done:
+    # popping ra, fp, s1, s2, s3, s4
+    lw ra, 20(sp)
+    lw fp, 16(sp)
+    lw s1, 12(sp)
+    lw s2, 8(sp)
+    lw s3, 4(sp)
+    lw s4, 0(sp)
+    addi sp, sp, 24
+    # ret
+
+    # syscall return
     addi a0, x0, 0          # return value = 0
     addi a7, x0, 93         # sys_exit
     ecall
+
+
+    
+
+# multiply a0 and a1 and put it in a0
+mult:
+    addi   t3, a0, 0    # t3 = A (multiplicand, will be shifted left)
+    addi   t4, a1, 0    # t4 = B (multiplier, will be shifted right)
+
+    addi   t5, zero, 0  # t5 = result accumulator, C = 0
+
+mult_loop:
+    beq  t4, x0, mult_done   # if B == 0, done
+
+    andi t6, t4, 1           # t6 = B & 1 (check lowest bit)
+    beq  t6, x0, mult_skipadd    # if bit is 0, skip the add
+
+    add  t5, t5, t3          # C += A
+
+mult_skipadd:
+    slli t3, t3, 1           # A <<= 1
+    srli t4, t4, 1           # B >>= 1 (logical shift, B treated as unsigned)
+
+    j    mult_loop
+
+mult_done:
+    addi  a0, t5, 0     # store result
+    ret
