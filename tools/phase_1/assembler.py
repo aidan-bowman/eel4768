@@ -180,6 +180,9 @@ def main():
 
     parsed_lines = []
 
+    # Tracks global symbols (currently ignored, but should be visible outside of program once implemented)
+    global_symbols = set()
+
     # --- PASS 1: Calculate addresses & build symbol table[cite: 1] ---
     for raw_line in lines:
         # Strip comments
@@ -194,6 +197,12 @@ def main():
         elif line.startswith(".data"):
             current_section = ".data"
             continue
+        elif line.startswith(".globl") or line.startswith(".global"):
+            tokens = line.split()
+            for symbol in tokens[1:]:
+                global_symbols.add(symbol)
+            continue
+            
 
         # Handle labels
         if ':' in line:

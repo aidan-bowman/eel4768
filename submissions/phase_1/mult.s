@@ -33,5 +33,6 @@ mul_done:
 
 done:
     # terminate execution (matching example convention)
-    li   a7, 10
+    addi a0, x0, 0          # return value = 0
+    addi a7, x0, 93         # sys_exit
     ecall
