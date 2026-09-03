@@ -18,11 +18,6 @@ c:      .word 0, 0, 0
 .globl main
 
 main:
-    # TODO: SOBEL CODE GOES HERE
-
-    # TODO: REWRITE AS FUNCTION
-    # TODO: MAKE THIS WORK WITH 3x3 MATRICES
-gemm:    
     addi sp, sp, -24
     sw ra, 20(sp)
     sw fp, 16(sp)
@@ -30,91 +25,146 @@ gemm:
     sw s2, 8(sp)
     sw s3, 4(sp)
     sw s4, 0(sp)
-    addi fp, sp, 20         # unsure this is the right number
+    addi fp, sp, 20
 
-    # using s1, s2, s3, s4, a0, a1, t2
-    # since we exit via syscall, we don't have to worry about
-    # pushing saved registers on the stack! yippee
+    lui  s1, 0x10010        # load data address
+    addi s2, zero, 0        # top left for A (funky increment)
+    addi s3, s1, 172        # index for C (we can make this easy for us!
+    # using s4 for sum we're putting in C
     
-    addi s1, zero, 0        # index i for C (increments by 16 since we know matrices are 4x4)
-    addi s2, zero, 0        # index j for C (increments by 4 since we're 32bit)
-    lui  s4, 0x10010        # Load data segment address
-
-    # a0 used for desired address of A, then value from A
-    # a1 used for desired address of B, then value from B
-
-    # s3 used for sum we're storing in C
-    # t2 used for temporary values here and there
-
-gemm_loop:   
-    # since we know k goes from 0-3, lets just hardcode all 4 values
     
-    # k = 0
-    add a0, s4, s1          # address = A_i0
-    lw   a0, 0(a0)          # load A_ik
+main_loop:
+    addi s3, zero, 0        # zero out sum
     
-    addi a1, s4, 64         # address = B_00
-    add a1, a1, s2          # address = B_0j
-    lw   a1, 0(a1)          # load B_kj
-
-    jal mult
-    addi s3, a0, 0
-
-    # k = 1
-    add a0, s4, s1          # address = A_i0
-    lw   a0, 4(a0)          # load A_ik
+    # 9 spaces to compare (annoying for A)
+    # Gx, Gy:   0 4 8, 12 16 20, 24 28 32
+    # A:        0 4 8, 20 24 28, 40 44 48
+    # add 100 to Gx to get to right spot
+    # add 136 to Gy
     
-    addi a1, s4, 64         # address = B_00
-    add a1, a1, s2          # address = B_0j
-    lw   a1, 16(a1)          # load B_kj
+    # box 1
+    add  a1, s1, s2         # A + topleft
+    lw   a1, 0(a1)          # load to box 1 (see pattern above)
 
-    jal mult
-    add s3, s3, a0
+    lw   a0, 100(s1)        # load Gx (see pattern above)
 
-    # k = 2
-    add a0, s4, s1          # address = A_i0
-    lw   a0, 8(a0)          # load A_ik
+    jal  mult
+    add  s4, s4, a0         # add prod into s4
+
+    lw   a0, 136(s1)       # load Gy
+
+    jal  mult
+    add  s4, s4, a0         # add prod into s4 again
+
+
+    # box 2
+    add  a1, s1, s2
+    lw   a1, 4(a1)
+
+    lw   a0, 104(s1)
+
+    jal  mult
+    add  s4, s4, a0
+
+    lw   a0, 140(s1)
+
+    jal  mult
+    add  s4, s4, a0
+
     
-    addi a1, s4, 64         # address = B_00
-    add a1, a1, s2          # address = B_0j
-    lw   a1, 32(a1)          # load B_kj
+    # box 3
+    add  a1, s1, s2
+    lw   a1, 8(a1)
+    lw   a0, 108(s1)
+    jal  mult
+    add  s4, s4, a0
+    lw   a0, 144(s1)
+    jal  mult
+    add  s4, s4, a0
 
-    jal mult
-    add s3, s3, a0
-
-    # k = 3
-    add a0, s4, s1          # address = A_i0
-    lw   a0, 12(a0)          # load A_ik
     
-    addi a1, s4, 64         # address = B_00
-    add a1, a1, s2          # address = B_0j
-    lw   a1, 48(a1)         # load B_kj
+    # box 4
+    add  a1, s1, s2
+    lw   a1, 20(a1)
+    lw   a0, 112(s1)
+    jal  mult
+    add  s4, s4, a0
+    lw   a0, 148(s1)
+    jal  mult
+    add  s4, s4, a0
 
-    jal mult
-    add s3, s3, a0
-
-    # store sum into C_ij
-    add  t2, s4, s1         # address = i  (not C_ij!!)
-    add  t2, t2, s2         # address = ij (not C_ij!!)
-    sw   s3, 128(t2)        # store C_ij
-
-
-gemm_loopreturn:
-    # remember, s1 is i, s2 is j
-    addi s2, s2, 4          # j += 4
-
-    # if (j == 16) { j = 0, i += 16 }
-    addi t2, zero, 16       # 4 steps * 4 bitwidth
-    bne s2, t2, gemm_checki
-    addi s2, zero, 0
-    addi s1, s1, 16
     
-gemm_checki:
-    # if (i != 64) { goto loop }
-    addi t2, zero, 64       # 4 steps * 4 columns * 4 bitwidth
-    bne s1, t2, gemm_loop
+    # box 5
+    add  a1, s1, s2
+    lw   a1, 24(a1)
+    lw   a0, 116(s1)
+    jal  mult
+    add  s4, s4, a0
+    lw   a0, 152(s1)
+    jal  mult
+    add  s4, s4, a0
 
-gemm_done:
+    
+    # box 6
+    add  a1, s1, s2
+    lw   a1, 28(a1)
+    lw   a0, 120(s1)
+    jal  mult
+    add  s4, s4, a0
+    lw   a0, 156(s1)
+    jal  mult
+    add  s4, s4, a0
+
+    
+    # box 7
+    add  a1, s1, s2
+    lw   a1, 40(a1)
+    lw   a0, 124(s1)
+    jal  mult
+    add  s4, s4, a0
+    lw   a0, 160(s1)
+    jal  mult
+    add  s4, s4, a0
+
+    
+    # box 8
+    add  a1, s1, s2
+    lw   a1, 44(a1)
+    lw   a0, 128(s1)
+    jal  mult
+    add  s4, s4, a0
+    lw   a0, 164(s1)
+    jal  mult
+    add  s4, s4, a0
+
+    
+    # box 9
+    add  a1, s1, s2
+    lw   a1, 48(a1)
+    lw   a0, 132(s1)
+    jal  mult
+    add  s4, s4, a0
+    lw   a0, 168(s1)
+    jal  mult
+    add  s4, s4, a0
+
+
+
+
+    # handle looping
+
+    sw s4, 0(s3)
+
+    # s3 += 4
+    # if ((s3 == 12) || (s3 == 24))
+    #   s2 += 12
+    # else
+    #   s2 += 4
+    # goto main_loop if s3 != 36
+
+    
+    
+main_done:
     # popping ra, fp, s1, s2, s3, s4
     lw ra, 20(sp)
     lw fp, 16(sp)
@@ -133,7 +183,8 @@ gemm_done:
 
     
 
-# multiply a0 and a1 and put it in a0
+    # multiply a0 and a1 and put it in a0
+    # a1 is untouched! yippee!!!
 mult:
     addi   t3, a0, 0    # t3 = A (multiplicand, will be shifted left)
     addi   t4, a1, 0    # t4 = B (multiplier, will be shifted right)
