@@ -1,0 +1,11 @@
+Phase 1 local test -- configuration 1 only
+Submission: /home/cheesepizza2/Workshop/eel4768/submissions
+
+PASS  Assembly:  gemm (config 1)
+FAIL  Assembly:  mult (config 1)      --  no memory dump (no Mem[0x10010008] line): the program did not assemble, or crashed
+FAIL  Assembly:  sobel (config 1)     --  sobel.s not found in the submission
+PASS  Assembly:  addition (config 1)
+PASS  Assembler: addition (config 1)
+PASS  Assembler: all_instructions
+
+4/6 PASS
