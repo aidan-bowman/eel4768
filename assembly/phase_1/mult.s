@@ -4,10 +4,10 @@ b: .word 59
 c: .word 0
 
 .text
-.global _main
+.global main
 
 main:
-    lui t0, zero, 0x10010   # data segment address
+    lui t0, 0x10010   # data segment address
 
     lw   t1, 0(t0)      # t1 = A (multiplicand, will be shifted left)
     lw   t2, 4(t0)      # t2 = B (multiplier, will be shifted right)
@@ -32,7 +32,6 @@ mul_done:
     sw   t3, 8(t0)          # store result into c
 
 done:
-    # terminate execution (matching example convention)
-    addi a0, x0, 0          # return value = 0
-    addi a7, x0, 93         # sys_exit
+    addi a0, x0, 0         # return value = 0
+    addi a7, x0, 93        # sys_exit
     ecall
