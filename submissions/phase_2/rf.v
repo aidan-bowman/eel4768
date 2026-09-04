@@ -48,8 +48,58 @@ module rf #(
     input  wire [ 4:0] i_rd_waddr,
     input  wire [31:0] i_rd_wdata
 );
-    // Your implementation goes under here
-    // ------------------------------------
+
+    // Register storage: 32 registers of 32 bits each
+    // x0 (registers[0]) is hardwired to zero via read muxing
+    reg [31:0] registers [31:0];
+    integer     i;
+   
+
+    // ========================================
+    // Synchronous Write Port
+    // ========================================
+    always @(posedge i_clk) begin
+        if (i_rst) begin
+            // Reset all registers to zero
+            for (i = 0; i < 32; i = i + 1) begin
+                registers[i] <= 32'b0;
+            end
+        end else if (i_rd_wen && i_rd_waddr != 5'b0) begin
+            // Write to register file (except x0, which is read-only)
+            // The condition i_rd_waddr != 5'b0 prevents writes to x0
+            registers[i_rd_waddr] <= i_rd_wdata;
+        end
+    end
+
+    // ========================================
+    // Asynchronous Read Ports
+    // ========================================
+    wire [31:0] rs1_data = (i_rs1_raddr == 5'b0) ? 32'b0 : registers[i_rs1_raddr];
+    wire [31:0] rs2_data = (i_rs2_raddr == 5'b0) ? 32'b0 : registers[i_rs2_raddr];
+
+    // ========================================
+    // Bypass Logic (Optional)
+    // ========================================
+    // In bypass mode, if a write is happening to the same register being read,
+    // forward the write data immediately without waiting for the clock edge.
+    // This is a common optimization in pipelined cores.
+    generate
+        if (BYPASS_EN) begin : bypass_mode
+            // Read port 1: forward write data if address matches
+            assign o_rs1_rdata = (i_rd_wen && i_rd_waddr == i_rs1_raddr && i_rd_waddr != 5'b0) 
+                                 ? i_rd_wdata 
+                                 : rs1_data;
+            
+            // Read port 2: forward write data if address matches
+            assign o_rs2_rdata = (i_rd_wen && i_rd_waddr == i_rs2_raddr && i_rd_waddr != 5'b0) 
+                                 ? i_rd_wdata 
+                                 : rs2_data;
+        end else begin : no_bypass_mode
+            // Without bypass, reads see only what's in the register file
+            assign o_rs1_rdata = rs1_data;
+            assign o_rs2_rdata = rs2_data;
+        end
+    endgenerate
 
 endmodule
 
