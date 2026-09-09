@@ -118,22 +118,21 @@ module decoder (
             .o_immediate (o_immediate)
             );
 
-   // TODO:
-   // o_op1_sel
-   // o_op2_sel
-
-   assign o_alu_opsel    = i_inst[14:12]; // funct3
-   assign o_alu_sub      = i_inst[   30]; // second digit of funct7
+   assign o_op1_sel      = is_auipc | is_jal;
+   assign o_op2_sel      = ~(is_arr | is_branch);
+   assign o_alu_opsel    = (is_arr | is_arr_imm | is_branch) ? i_inst[14:12] : 3'b000; // funct3 if we're arithmetic or branch, or addition for other ops
+   assign o_alu_sub      = is_arr & i_inst[   30]; // second digit of funct7 (if we're doing arithmetic)
    assign o_alu_unsigned = i_inst[   30]; // ditto (imm goes around this bit)
    assign o_alu_arith    = i_inst[   30]; // ditto
-   
 
+   assign o_branch = is_branch;
+   assign o_jump   = is_jal | is_jalr;
+    
+   assign o_branch_equal    = ~i_inst[14];
+   assign o_branch_unsigned = i_inst[13];
+   assign o_branch_inver    = i_inst[12];
+    
    // TODO:
-   // o_branch
-   // o_jump
-   // o_branch_equal
-   // o_branch_unsigned
-   // o_branch_invert
    // o_dmem_ren
    // o_dmem_wen
    // o_dmem_align
@@ -145,10 +144,6 @@ module decoder (
    // o_pc_sel
    
    
-   
-   
-        
-
 endmodule
 
 `default_nettype wire
