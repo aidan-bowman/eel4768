@@ -1,7 +1,5 @@
 `default_nettype none
 
-// Remember to instantiate the imm in this module
-
 module decoder (
     // Input instruction word.
     input  wire [31:0] i_inst,
@@ -104,9 +102,8 @@ module decoder (
                    (is_lui | is_auipc)              ? 6'b010000 :
                    (is_jal)                         ? 6'b100000;
 
-   // TODO:
-   // o_legal
-   // o_halt
+   assign o_halt  = (i_inst = 32'h00100073);
+   assign o_legal = is_system & ~o_halt;
 
    // rs1, rs2, and rd are always in the same place (unless they don't exist, in which case don't care)
    assign rd  = i_inst[11: 7];
@@ -132,18 +129,21 @@ module decoder (
    assign o_branch_unsigned = i_inst[13];
    assign o_branch_inver    = i_inst[12];
     
-   // TODO:
-   // o_dmem_ren
-   // o_dmem_wen
-   // o_dmem_align
-   // o_dmem_memb
-   // o_dmem_memh
-   // o_dmem_memw
-   // o_dmem_memu
-   // o_rd_sel
-   // o_pc_sel
+   assign o_dmem_ren   = is_load;
+   assign o_dmem_wen   = is_store;
+   assign o_dmem_memb  = ~(i_inst[13] | i_inst[12]);
+   assign o_dmem_memh  = i_inst[12];
+   assign o_dmem_memw  = i_inst[13];
+   assign o_dmem_align = {o_dmem_memh, ~o_dmem_memw};
+   assign o_dmem_memu  = i_inst[14];
    
+   assign o_rd_sel = (is_arr | is_arr_imm | is_auipc) ? 2'b00 :
+                     (is_lui)                         ? 2'b01 :
+                     (is_jal | is_jalr)               ? 2'b10 :
+                     (is_load)                        ? 2'b11;
    
+   assign o_pc_sel = is_jalr;
+
 endmodule
 
 `default_nettype wire
