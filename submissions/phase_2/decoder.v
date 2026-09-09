@@ -84,8 +84,70 @@ module decoder (
     // rather than directly to the PC + immediate. This is used for JALR.
     output wire        o_pc_sel
 );
-    // Your implementation goes under here
-    // ------------------------------------
+
+   // Opcode Decoding
+   wire is_arr     = (i_inst[6:0] == 7'b0110011);
+   wire is_arr_imm = (i_inst[6:0] == 7'b0010011);
+   wire is_load    = (i_inst[6:0] == 7'b0000011);
+   wire is_lui     = (i_inst[6:0] == 7'b0110111);
+   wire is_auipc   = (i_inst[6:0] == 7'b0010111);
+   wire is_store   = (i_inst[6:0] == 7'b0100011);
+   wire is_branch  = (i_inst[6:0] == 7'b1100011);
+   wire is_jal     = (i_inst[6:0] == 7'b1101111);
+   wire is_jalr    = (i_inst[6:0] == 7'b1100111);
+   wire is_system  = (i_inst[6:0] == 7'b1110011);
+
+   wire format   = (is_arr | is_system)             ? 6'b000001 :
+                   (is_arr_imm | is_load | is_jalr) ? 6'b000010 :
+                   (is_store)                       ? 6'b000100 :
+                   (is_branch)                      ? 6'b001000 :
+                   (is_lui | is_auipc)              ? 6'b010000 :
+                   (is_jal)                         ? 6'b100000;
+
+   // TODO:
+   // o_legal
+   // o_halt
+
+   // rs1, rs2, and rd are always in the same place (unless they don't exist, in which case don't care)
+   assign rd  = i_inst[11: 7];
+   assign rs1 = i_inst[19:15];
+   assign rs2 = i_inst[24:20];
+   
+   imm imm (.i_inst      (i_inst),
+            .i_format    (format),
+            .o_immediate (o_immediate)
+            );
+
+   // TODO:
+   // o_op1_sel
+   // o_op2_sel
+
+   assign o_alu_opsel    = i_inst[14:12]; // funct3
+   assign o_alu_sub      = i_inst[   30]; // second digit of funct7
+   assign o_alu_unsigned = i_inst[   30]; // ditto (imm goes around this bit)
+   assign o_alu_arith    = i_inst[   30]; // ditto
+   
+
+   // TODO:
+   // o_branch
+   // o_jump
+   // o_branch_equal
+   // o_branch_unsigned
+   // o_branch_invert
+   // o_dmem_ren
+   // o_dmem_wen
+   // o_dmem_align
+   // o_dmem_memb
+   // o_dmem_memh
+   // o_dmem_memw
+   // o_dmem_memu
+   // o_rd_sel
+   // o_pc_sel
+   
+   
+   
+   
+        
 
 endmodule
 
