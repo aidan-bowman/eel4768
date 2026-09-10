@@ -102,13 +102,13 @@ module decoder (
                    (is_lui | is_auipc)              ? 6'b010000 :
                    (is_jal)                         ? 6'b100000;
 
-   assign o_halt  = (i_inst = 32'h00100073);
+   assign o_halt  = (i_inst == 32'h00100073);
    assign o_legal = is_system & ~o_halt;
 
    // rs1, rs2, and rd are always in the same place (unless they don't exist, in which case don't care)
-   assign rd  = i_inst[11: 7];
-   assign rs1 = i_inst[19:15];
-   assign rs2 = i_inst[24:20];
+   assign o_rd  = i_inst[11: 7];
+   assign o_rs1 = i_inst[19:15];
+   assign o_rs2 = i_inst[24:20];
    
    imm imm (.i_inst      (i_inst),
             .i_format    (format),
@@ -127,7 +127,7 @@ module decoder (
     
    assign o_branch_equal    = ~i_inst[14];
    assign o_branch_unsigned = i_inst[13];
-   assign o_branch_inver    = i_inst[12];
+   assign o_branch_invert   = i_inst[12];
     
    assign o_dmem_ren   = is_load;
    assign o_dmem_wen   = is_store;
@@ -137,10 +137,10 @@ module decoder (
    assign o_dmem_align = {o_dmem_memh, ~o_dmem_memw};
    assign o_dmem_memu  = i_inst[14];
    
-   assign o_rd_sel = (is_arr | is_arr_imm | is_auipc) ? 2'b00 :
-                     (is_lui)                         ? 2'b01 :
-                     (is_jal | is_jalr)               ? 2'b10 :
-                     (is_load)                        ? 2'b11;
+   assign o_rd_sel = (is_arr | is_arr_imm | is_auipc) ? 4'b0000 :
+                     (is_lui)                         ? 4'b0010 :
+                     (is_jal | is_jalr)               ? 4'b0100 :
+                     (is_load)                        ? 4'b1000;
    
    assign o_pc_sel = is_jalr;
 
