@@ -81,16 +81,6 @@ module rf #(
            registers[17] <= 32'b0;
            registers[18] <= 32'b0;
            registers[19] <= 32'b0;
-           registers[10] <= 32'b0;
-           registers[11] <= 32'b0;
-           registers[12] <= 32'b0;
-           registers[13] <= 32'b0;
-           registers[14] <= 32'b0;
-           registers[15] <= 32'b0;
-           registers[16] <= 32'b0;
-           registers[17] <= 32'b0;
-           registers[18] <= 32'b0;
-           registers[19] <= 32'b0;
            registers[20] <= 32'b0;
            registers[21] <= 32'b0;
            registers[22] <= 32'b0;
