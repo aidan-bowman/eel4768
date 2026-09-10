@@ -137,7 +137,7 @@ module decoder (
    assign o_dmem_align = {o_dmem_memh, ~o_dmem_memw};
    assign o_dmem_memu  = i_inst[14];
    
-   assign o_rd_sel = (is_arr | is_arr_imm | is_auipc) ? 4'b0000 :
+    assign o_rd_sel = (is_arr | is_arr_imm | is_auipc) ? 4'b0001 :
                      (is_lui)                         ? 4'b0010 :
                      (is_jal | is_jalr)               ? 4'b0100 :
                      (is_load)                        ? 4'b1000;
