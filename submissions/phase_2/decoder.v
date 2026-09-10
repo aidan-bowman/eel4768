@@ -95,12 +95,12 @@ module decoder (
    wire is_jalr    = (i_inst[6:0] == 7'b1100111);
    wire is_system  = (i_inst[6:0] == 7'b1110011);
 
-   wire format   = (is_arr | is_system)             ? 6'b000001 :
-                   (is_arr_imm | is_load | is_jalr) ? 6'b000010 :
-                   (is_store)                       ? 6'b000100 :
-                   (is_branch)                      ? 6'b001000 :
-                   (is_lui | is_auipc)              ? 6'b010000 :
-                   (is_jal)                         ? 6'b100000;
+   wire [5:0] format = (is_arr | is_system)             ? 6'b000001 :
+                       (is_arr_imm | is_load | is_jalr) ? 6'b000010 :
+                       (is_store)                       ? 6'b000100 :
+                       (is_branch)                      ? 6'b001000 :
+                       (is_lui | is_auipc)              ? 6'b010000 :
+                       (is_jal)                         ? 6'b100000 : 6'b000000;
 
    assign o_halt  = (i_inst == 32'h00100073);
    assign o_legal = is_system & ~o_halt;
