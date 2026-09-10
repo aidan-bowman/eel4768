@@ -103,7 +103,8 @@ module decoder (
                        (is_jal)                         ? 6'b100000 : 6'b000000;
 
    assign o_halt  = (i_inst == 32'h00100073);
-   assign o_legal = ~is_system | o_halt;
+   assign o_legal = is_arr | is_arr_imm | is_load | is_lui | is_auipc | is_store | is_branch | is_jal | is_jalr | o_halt;
+   
 
    // rs1, rs2, and rd are always in the same place (unless they don't exist, in which case don't care)
    assign o_rd  = i_inst[11: 7];
