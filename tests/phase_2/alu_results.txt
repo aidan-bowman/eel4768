@@ -1,0 +1,113 @@
+VCD info: dumpfile alu_tb.vcd opened for output.
+========== ALU testbench ==========
+--- add/sub ---
+[FAIL] add: 7 + 9
+       op1=00000007 op2=00000009 opsel=000 sub=0 unsigned=0 arith=0
+       result=00000010 expected=00000010
+       eq=0 expected=0, slt=1 expected=0
+[PASS] add: zero
+[FAIL] add: wrap
+       op1=ffffffff op2=00000001 opsel=000 sub=0 unsigned=0 arith=0
+       result=00000000 expected=00000000
+       eq=0 expected=0, slt=1 expected=0
+[PASS] sub: 9 - 7
+[FAIL] sub: 7 - 9
+       op1=00000007 op2=00000009 opsel=000 sub=1 unsigned=0 arith=0
+       result=fffffffe expected=fffffffe
+       eq=0 expected=0, slt=1 expected=0
+[PASS] sub: equal
+--- logical operations ---
+[PASS] xor
+[PASS] or
+[FAIL] and
+       op1=ffff0000 op2=0f0ff0f0 opsel=111 sub=0 unsigned=0 arith=0
+       result=0f0f0000 expected=0f0f0000
+       eq=0 expected=0, slt=1 expected=0
+--- shifts ---
+[FAIL] sll: 1 << 4
+       op1=00000001 op2=00000004 opsel=001 sub=0 unsigned=0 arith=0
+       result=00000010 expected=00000010
+       eq=0 expected=0, slt=1 expected=0
+[FAIL] sll: shift 31
+       op1=00000001 op2=0000001f opsel=001 sub=0 unsigned=0 arith=0
+       result=80000000 expected=80000000
+       eq=0 expected=0, slt=1 expected=0
+[PASS] sll: shift 32 becomes shift 0
+[FAIL] srl: positive
+       op1=80000000 op2=00000004 opsel=101 sub=0 unsigned=0 arith=0
+       result=08000000 expected=08000000
+       eq=0 expected=0, slt=1 expected=0
+[FAIL] srl: all ones
+       op1=ffffffff op2=0000001c opsel=101 sub=0 unsigned=0 arith=0
+       result=0000000f expected=0000000f
+       eq=0 expected=0, slt=1 expected=0
+[FAIL] sra: negative
+       op1=80000000 op2=00000004 opsel=101 sub=0 unsigned=0 arith=1
+       result=f8000000 expected=f8000000
+       eq=0 expected=0, slt=1 expected=0
+[FAIL] sra: -1
+       op1=ffffffff op2=0000001f opsel=101 sub=0 unsigned=0 arith=1
+       result=ffffffff expected=ffffffff
+       eq=0 expected=0, slt=1 expected=0
+--- comparisons ---
+[PASS] slt signed: -1 < 1
+[PASS] slt signed: 1 !< -1
+[PASS] sltu unsigned: 0xffffffff !< 1
+[PASS] sltu unsigned: 1 < 0xffffffff
+--- random reference-model tests ---
+[FAIL] random 15: op1=a2b70445 op2=9b3a4036 opsel=101
+       result=fffffe8a expected=0000028a eq=0/0 slt=0/0
+[FAIL] random 62: op1=d3d0bca7 op2=f1a4a6e3 opsel=101
+       result=fa7a1794 expected=1a7a1794 eq=0/0 slt=1/1
+[FAIL] random 91: op1=a6a2384d op2=e4b55cc9 opsel=101
+       result=ffd3511c expected=0053511c eq=0/0 slt=1/1
+[FAIL] random 102: op1=abbc2457 op2=357fcd6a opsel=101
+       result=ffeaef09 expected=002aef09 eq=0/0 slt=0/0
+[FAIL] random 107: op1=88b40e11 op2=a968c052 opsel=101
+       result=ffffe22d expected=0000222d eq=0/0 slt=1/1
+[FAIL] random 163: op1=bcb15879 op2=72319be4 opsel=101
+       result=fbcb1587 expected=0bcb1587 eq=0/0 slt=0/0
+[FAIL] random 180: op1=9614b22c op2=ebef9ad7 opsel=101
+       result=ffffff2c expected=0000012c eq=0/0 slt=1/1
+[FAIL] random 223: op1=a7974c4f op2=2e9da35d opsel=101
+       result=fffffffd expected=00000005 eq=0/0 slt=0/0
+[FAIL] random 250: op1=8c6c6a18 op2=5dd2fdbb opsel=101
+       result=fffffff1 expected=00000011 eq=0/0 slt=0/0
+[FAIL] random 264: op1=ebf230d7 op2=6d50a3da opsel=101
+       result=fffffffa expected=0000003a eq=0/0 slt=1/1
+[FAIL] random 323: op1=b3aa0667 op2=866e620c opsel=101
+       result=fffb3aa0 expected=000b3aa0 eq=0/0 slt=0/0
+[FAIL] random 334: op1=ecaaead9 op2=1c67eb38 opsel=101
+       result=ffffffec expected=000000ec eq=0/0 slt=0/0
+[FAIL] random 489: op1=c3035e86 op2=b359b666 opsel=101
+       result=ff0c0d7a expected=030c0d7a eq=0/0 slt=0/0
+[FAIL] random 513: op1=8a1c8a14 op2=95ad162b opsel=101
+       result=fff14391 expected=00114391 eq=0/0 slt=1/1
+[FAIL] random 532: op1=cb8a7a97 op2=7e254ffc opsel=101
+       result=fffffffc expected=0000000c eq=0/0 slt=0/0
+[FAIL] random 613: op1=f5d3c4eb op2=5e3171bc opsel=101
+       result=ffffffff expected=0000000f eq=0/0 slt=1/1
+[FAIL] random 646: op1=e0aa22c1 op2=ad4b725a opsel=101
+       result=fffffff8 expected=00000038 eq=0/0 slt=0/0
+[FAIL] random 656: op1=f85c90f0 op2=241f1f48 opsel=101
+       result=fff85c90 expected=00f85c90 eq=0/0 slt=1/1
+[FAIL] random 740: op1=de1bd4bc op2=194be932 opsel=101
+       result=fffff786 expected=00003786 eq=0/0 slt=1/1
+[FAIL] random 749: op1=ba07f874 op2=56f765ad opsel=101
+       result=fffdd03f expected=0005d03f eq=0/0 slt=1/1
+[FAIL] random 750: op1=b02b2c60 op2=6fba37df opsel=101
+       result=ffffffff expected=00000001 eq=0/0 slt=1/1
+[FAIL] random 834: op1=f5f994eb op2=38462170 opsel=101
+       result=fffff5f9 expected=0000f5f9 eq=0/0 slt=1/1
+[FAIL] random 859: op1=f85b96f0 op2=1deba33b opsel=101
+       result=ffffffff expected=0000001f eq=0/0 slt=0/0
+[FAIL] random 882: op1=d2e278a5 op2=d744c8ae opsel=101
+       result=ffff4b89 expected=00034b89 eq=0/0 slt=1/1
+[FAIL] random 924: op1=c4b6e289 op2=b0d7ce61 opsel=101
+       result=e25b7144 expected=625b7144 eq=0/0 slt=0/0
+[FAIL] random 951: op1=93553c26 op2=89414212 opsel=101
+       result=ffffe4d5 expected=000024d5 eq=0/0 slt=0/0
+==================================
+984 passed, 36 failed
+TEST FAILED
+testbenches/phase_2/no_trace/phase_2/alu_tb.v:182: $finish called at 1020000 (1ps)

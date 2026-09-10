@@ -1,0 +1,53 @@
+VCD info: dumpfile decoder_tb.vcd opened for output.
+========== DECODER testbench ==========
+[PASS] R-type ADD
+[PASS] R-type SUB
+[FAIL] I-type XORI
+       inst=fff2c293
+       legal=1/1 halt=0/0 rs1=5/5 rs2=31/0 rd=5/5
+       imm=ffffffff/ffffffff op1_sel=0/0 op2_sel=1/1 alu=100/100 sub=0/0
+       branch=0/0 jump=0/0 ren=0/0 wen=0/0 rd_sel=0001/0001 pc_sel=0/0
+[FAIL] LUI
+       inst=123452b7
+       legal=1/1 halt=0/0 rs1=8/0 rs2=3/0 rd=5/5
+       imm=12345000/12345000 op1_sel=0/0 op2_sel=1/1 alu=000/000 sub=0/0
+       branch=0/0 jump=0/0 ren=0/0 wen=0/0 rd_sel=0010/0010 pc_sel=0/0
+[FAIL] AUIPC
+       inst=12345297
+       legal=1/1 halt=0/0 rs1=8/0 rs2=3/0 rd=5/5
+       imm=12345000/12345000 op1_sel=1/1 op2_sel=1/1 alu=000/000 sub=0/0
+       branch=0/0 jump=0/0 ren=0/0 wen=0/0 rd_sel=0001/0001 pc_sel=0/0
+[FAIL] LW
+       inst=00832283
+       legal=1/1 halt=0/0 rs1=6/6 rs2=8/0 rd=5/5
+       imm=00000008/00000008 op1_sel=0/0 op2_sel=1/1 alu=000/000 sub=0/0
+       branch=0/0 jump=0/0 ren=1/1 wen=0/0 rd_sel=1000/1000 pc_sel=0/0
+[FAIL] SW
+       inst=00532423
+       legal=1/1 halt=0/0 rs1=6/6 rs2=5/5 rd=8/0
+       imm=00000008/00000008 op1_sel=0/0 op2_sel=1/1 alu=000/000 sub=0/0
+       branch=0/0 jump=0/0 ren=0/0 wen=1/1 rd_sel=0000/0000 pc_sel=0/0
+[FAIL] BEQ
+       inst=00628863
+       legal=1/1 halt=0/0 rs1=5/5 rs2=6/6 rd=16/0
+       imm=00000010/00000010 op1_sel=0/0 op2_sel=0/0 alu=000/000 sub=0/0
+       branch=1/1 jump=0/0 ren=0/0 wen=0/0 rd_sel=0000/0000 pc_sel=0/0
+[FAIL] JAL
+       inst=010002ef
+       legal=1/1 halt=0/0 rs1=0/0 rs2=16/0 rd=5/5
+       imm=00000010/00000010 op1_sel=1/1 op2_sel=1/1 alu=000/000 sub=0/0
+       branch=0/0 jump=1/1 ren=0/0 wen=0/0 rd_sel=0100/0100 pc_sel=0/0
+[FAIL] JALR
+       inst=00c302e7
+       legal=1/1 halt=0/0 rs1=6/6 rs2=12/0 rd=5/5
+       imm=0000000c/0000000c op1_sel=0/0 op2_sel=1/1 alu=000/000 sub=0/0
+       branch=0/0 jump=1/1 ren=0/0 wen=0/0 rd_sel=0100/0100 pc_sel=1/1
+[FAIL] EBREAK
+       inst=00100073
+       legal=1/0 halt=1/1 rs1=0/0 rs2=1/0 rd=0/0
+       imm=00000000/00000000 op1_sel=0/0 op2_sel=1/1 alu=000/000 sub=0/0
+       branch=0/0 jump=0/0 ren=0/0 wen=0/0 rd_sel=0000/0000 pc_sel=0/0
+=======================================
+2 passed, 9 failed
+TEST FAILED
+testbenches/phase_2/no_trace/phase_2/decoder_tb.v:179: $finish called at 11000 (1ps)

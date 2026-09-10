@@ -1,0 +1,17 @@
+VCD info: dumpfile imm_tb.vcd opened for output.
+========== IMM testbench ==========
+[PASS] I-type positive
+[PASS] I-type negative
+[PASS] S-type positive
+[PASS] S-type negative
+[PASS] B-type positive
+[PASS] B-type negative
+[PASS] U-type
+[PASS] J-type positive
+[PASS] J-type negative
+[PASS] R-type default
+[PASS] zero format default
+===================================
+11 passed, 0 failed
+ALL TESTS PASSED
+testbenches/phase_2/no_trace/phase_2/imm_tb.v:76: $finish called at 11000 (1ps)

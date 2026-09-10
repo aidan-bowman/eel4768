@@ -1,0 +1,14 @@
+VCD info: dumpfile rf_tb.vcd opened for output.
+========== RF testbench ==========
+[PASS] reset clears x0
+[PASS] write/read x5
+[PASS] independent read ports
+[PASS] x0 ignores writes
+[PASS] write disabled preserves data
+[PASS] bypass forwards pending write
+[PASS] write commits to both modes
+[PASS] bypass does not forward x0
+==================================
+8 passed, 0 failed
+ALL TESTS PASSED
+testbenches/phase_2/no_trace/phase_2/rf_tb.v:187: $finish called at 25000 (1ps)
