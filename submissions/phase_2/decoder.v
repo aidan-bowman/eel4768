@@ -102,12 +102,31 @@ module decoder (
                        (is_lui | is_auipc)              ? 6'b010000 :
                        (is_jal)                         ? 6'b100000 : 6'b000000;
 
+   wire valid_arr    = (i_inst[31:25] == 7'b0000000) |
+                       (((i_inst[14:12] == 3'b000) | (i_inst[14:12] == 3'b101)) & (i_inst[31:25] == 7'b0100000));
+   wire valid_load   = ~((i_inst[14:12] == 3'b011) | (i_inst[14:12] == 3'b110) | (i_inst[14:12] == 3'b111));
+   wire valid_store  =   (i_inst[14:12] == 3'b000) | (i_inst[14:12] == 3'b001) | (i_inst[14:12] == 3'b010);
+   wire valid_branch = ~((i_inst[14:12] == 3'b010) | (i_inst[14:12] == 3'b011));
+   
+
    assign o_halt  = (i_inst == 32'h00100073);
-   assign o_legal = is_arr | is_arr_imm | is_load | is_lui | is_auipc | is_store | is_branch | is_jal | is_jalr | o_halt;
+
+   assign o_legal = (is_arr && valid_arr) |
+                    is_arr_imm |
+                    (is_load && valid_load) |
+                    is_lui |
+                    is_auipc |
+                    (is_store && valid_store) |
+                    (is_branch && valid_branch) |
+                    is_jal |
+                    (is_jalr && i_inst[14:12] == 3'b000) |
+                    o_halt;
+   
+   
    
 
    // rs1, rs2, and rd are always in the same place (unless they don't exist, in which case don't care)
-   assign o_rd  = i_inst[11: 7];
+   assign o_rd  = (is_arr | is_arr_imm | is_load | is_lui | is_auipc | is_jal | is_jalr) ? i_inst[11: 7] : 5'b00000;
    assign o_rs1 = i_inst[19:15];
    assign o_rs2 = i_inst[24:20];
    
@@ -119,9 +138,9 @@ module decoder (
    assign o_op1_sel      = is_auipc | is_jal;
    assign o_op2_sel      = ~(is_arr | is_branch);
    assign o_alu_opsel    = (is_arr | is_arr_imm | is_branch) ? i_inst[14:12] : 3'b000; // funct3 if we're arithmetic or branch, or addition for other ops
-   assign o_alu_sub      = is_arr & i_inst[   30]; // second digit of funct7 (if we're doing arithmetic)
-   assign o_alu_unsigned = i_inst[   30]; // ditto (imm goes around this bit)
-   assign o_alu_arith    = i_inst[   30]; // ditto
+   assign o_alu_sub      = is_arr & (i_inst[14:12] == 3'b000) & i_inst[30];
+   assign o_alu_unsigned = ((is_arr | is_arr_imm) & (i_inst[14:12] == 3'b011))) | (is_branch & i_inst[13]);
+   assign o_alu_arith    = is_arr & (i_inst[14:12] == 3'b101) & i_inst[30]; // ditto
 
    assign o_branch = is_branch;
    assign o_jump   = is_jal | is_jalr;
@@ -135,10 +154,10 @@ module decoder (
    assign o_dmem_memb  = ~(i_inst[13] | i_inst[12]);
    assign o_dmem_memh  = i_inst[12];
    assign o_dmem_memw  = i_inst[13];
-   assign o_dmem_align = {o_dmem_memh, ~o_dmem_memw};
+   assign o_dmem_align = {o_dmem_memw, ~o_dmem_memb};
    assign o_dmem_memu  = i_inst[14];
    
-    assign o_rd_sel = (is_arr | is_arr_imm | is_auipc) ? 4'b0001 :
+   assign o_rd_sel = (is_arr | is_arr_imm | is_auipc) ? 4'b0001 :
                      (is_lui)                         ? 4'b0010 :
                      (is_jal | is_jalr)               ? 4'b0100 :
                      (is_load)                        ? 4'b1000 : 4'b0000;
