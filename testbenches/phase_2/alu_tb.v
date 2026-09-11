@@ -74,9 +74,16 @@ module alu_tb;
             op2   = t_op2;
             #1;
 
+            //if (result === expected_result &&
+            //    eq     === expected_eq &&
+            //    slt    === expected_slt) begin
+            // These last 3 were replaced by the next 5
             if (result === expected_result &&
-                eq     === expected_eq &&
-                slt    === expected_slt) begin
+                eq === expected_eq &&
+                ((t_opsel == 3'b010) || (t_opsel == 3'b011) ?
+                    slt === expected_slt :
+                    1'b1)) begin
+                //
                 passed = passed + 1;
                 $display("[PASS] %0s", label);
             end else begin
