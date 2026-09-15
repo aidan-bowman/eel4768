@@ -1,0 +1,3 @@
+[submodule "course_files"]
+	path = course_files
+	url = https://github.com/UnaryLab/EEL4768_RISC-V_Project
