@@ -114,9 +114,48 @@ module hart #(
     // targets, and `jalr`'s cleared low bit are right.
     output wire [31:0] o_retire_next_pc
 );
-    // Your implementation goes under here
-    // ------------------------------------
 
+    // data
+    wire reg1_data;
+    wire reg2_data;
+    wire imm;
+
+    // pc
+    reg  pc;
+    
+    
+    // control
+    wire reg_write;
+    wire alu_src;
+    wire alu_op;
+    wire mem_read;
+    wire mem_write;
+    wire mem_toreg;
+    wire pc_src;
+    
+    
+    assign wire pc_plus_4 = pc + 4;
+
+
+    // TODO: fill in
+    decoder decoder ();
+
+    // TODO: fill in
+    rf rf ();
+
+    // TODO: fill in
+    alu alu();
+
+    always @(posedge i_clk) begin
+        if (i_rst) begin
+            pc <= RESET_ADDR;
+        end else begin
+            // TODO: change this!
+            pc <= pc_plus_4;
+        end
+    end
+    
+    assign wire o_imem_raddr = pc
 endmodule
 
 `default_nettype wire
