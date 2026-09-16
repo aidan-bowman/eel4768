@@ -102,24 +102,27 @@ module decoder (
                        (is_lui | is_auipc)              ? 6'b010000 :
                        (is_jal)                         ? 6'b100000 : 6'b000000;
 
-   wire valid_arr    = (i_inst[31:25] == 7'b0000000) |
-                       (((i_inst[14:12] == 3'b000) | (i_inst[14:12] == 3'b101)) & (i_inst[31:25] == 7'b0100000));
-   wire valid_load   = ~((i_inst[14:12] == 3'b011) | (i_inst[14:12] == 3'b110) | (i_inst[14:12] == 3'b111));
-   wire valid_store  =   (i_inst[14:12] == 3'b000) | (i_inst[14:12] == 3'b001) | (i_inst[14:12] == 3'b010);
-   wire valid_branch = ~((i_inst[14:12] == 3'b010) | (i_inst[14:12] == 3'b011));
+   wire valid_arr     = (i_inst[31:25] == 7'b0000000) |
+                        (((i_inst[14:12] == 3'b000) | (i_inst[14:12] == 3'b101)) & (i_inst[31:25] == 7'b0100000));
+   wire valid_arr_imm = (i_inst[14:12] == 3'b001) ? (i_inst[31:25] == 7'b0000000) :
+                        (i_inst[14:12] == 3'b101) ? (~i_inst[31] && (i_inst[29:25] == 5'b00000)) :
+                        1;    
+   wire valid_load    = ~((i_inst[14:12] == 3'b011) | (i_inst[14:12] == 3'b110) | (i_inst[14:12] == 3'b111));
+   wire valid_store   =   (i_inst[14:12] == 3'b000) | (i_inst[14:12] == 3'b001) | (i_inst[14:12] == 3'b010);
+   wire valid_branch  = ~((i_inst[14:12] == 3'b010) | (i_inst[14:12] == 3'b011));
    
 
    assign o_halt  = (i_inst == 32'h00100073);
 
-   assign o_legal = (is_arr && valid_arr) |
-                    is_arr_imm |
-                    (is_load && valid_load) |
+   assign o_legal = (is_arr & valid_arr) |
+                    (is_arr_imm & valid_arr_imm) |
+                    (is_load & valid_load) |
                     is_lui |
                     is_auipc |
-                    (is_store && valid_store) |
-                    (is_branch && valid_branch) |
+                    (is_store & valid_store) |
+                    (is_branch & valid_branch) |
                     is_jal |
-                    (is_jalr && i_inst[14:12] == 3'b000) |
+                    (is_jalr & (i_inst[14:12] == 3'b000)) |
                     o_halt;
    
    
@@ -139,8 +142,8 @@ module decoder (
    assign o_op2_sel      = ~(is_arr | is_branch);
    assign o_alu_opsel    = (is_arr | is_arr_imm | is_branch) ? i_inst[14:12] : 3'b000; // funct3 if we're arithmetic or branch, or addition for other ops
    assign o_alu_sub      = is_arr & (i_inst[14:12] == 3'b000) & i_inst[30];
-   assign o_alu_unsigned = ((is_arr | is_arr_imm) & (i_inst[14:12] == 3'b011))) | (is_branch & i_inst[13]);
-   assign o_alu_arith    = is_arr & (i_inst[14:12] == 3'b101) & i_inst[30]; // ditto
+   assign o_alu_unsigned = ((is_arr | is_arr_imm) & (i_inst[14:12] == 3'b011)) | (is_branch & i_inst[13]);
+   assign o_alu_arith    = (is_arr | is_arr_imm) & (i_inst[14:12] == 3'b101) & i_inst[30]; // ditto
 
    assign o_branch = is_branch;
    assign o_jump   = is_jal | is_jalr;

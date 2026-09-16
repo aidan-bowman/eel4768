@@ -96,7 +96,7 @@ module rf #(
            registers[30] <= 32'b0;
            registers[31] <= 32'b0;
            
-        end else if (i_rd_wen && i_rd_waddr != 5'b0) begin
+        end else if (i_rd_waddr != 5'b0) begin
             // Write to register file (except x0, which is read-only)
             // The condition i_rd_waddr != 5'b0 prevents writes to x0
             registers[i_rd_waddr] <= i_rd_wdata;
@@ -118,12 +118,12 @@ module rf #(
     generate
         if (BYPASS_EN) begin : bypass_mode
             // Read port 1: forward write data if address matches
-            assign o_rs1_rdata = (i_rd_wen && i_rd_waddr == i_rs1_raddr && i_rd_waddr != 5'b0) 
+            assign o_rs1_rdata = (i_rd_waddr == i_rs1_raddr && i_rd_waddr != 5'b0) 
                                  ? i_rd_wdata 
                                  : rs1_data;
             
             // Read port 2: forward write data if address matches
-            assign o_rs2_rdata = (i_rd_wen && i_rd_waddr == i_rs2_raddr && i_rd_waddr != 5'b0) 
+            assign o_rs2_rdata = (i_rd_waddr == i_rs2_raddr && i_rd_waddr != 5'b0) 
                                  ? i_rd_wdata 
                                  : rs2_data;
         end else begin : no_bypass_mode

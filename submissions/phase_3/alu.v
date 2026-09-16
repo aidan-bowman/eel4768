@@ -619,12 +619,8 @@ module alu (
     // 5. BRANCH SET-LESS-THAN OUTPUT
     // ============================================================
 
-    // i_unsigned controls branch comparison type.
-    // This output is independent of i_opsel.
-
-    assign o_slt = i_unsigned ?
-                   unsigned_less :
-                   signed_less;
+    assign o_slt = (i_opsel == 3'b011) | i_unsigned ?
+                   unsigned_less : signed_less;
 
 
     // ============================================================
