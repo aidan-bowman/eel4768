@@ -114,38 +114,88 @@ module hart #(
     // targets, and `jalr`'s cleared low bit are right.
     output wire [31:0] o_retire_next_pc
 );
-
-    // data
-    wire reg1_data;
-    wire reg2_data;
-    wire imm;
-
-    // pc
-    reg  pc;
+    // STAGE 1: FETCH INSTR
+    reg [31:0] pc;
+    assign o_imem_raddr = pc;
+    // i_imem_rdata holds instruction
     
     
-    // control
-    wire reg_write;
-    wire alu_src;
-    wire alu_op;
-    wire mem_read;
-    wire mem_write;
-    wire mem_toreg;
-    wire pc_src;
-    
-    
-    assign wire pc_plus_4 = pc + 4;
+    // STAGE 2: DECODE
+    wire        legal;
+    wire        halt;
+    wire [ 4:0] rs1;
+    wire [ 4:0] rs2;
+    wire [ 4:0] rd;
+    wire [31:0] imm;
+    wire        op1_pc_sel;
+    wire        op2_imm_sel;
+    wire [ 2:0] alu_opsel;
+    wire        alu_sub;
+    wire        alu_unsigned;
+    wire        alu_arith;
+    wire        inst_branch;
+    wire        inst_jump;
+    wire        branch_equal;
+    wire        branch_unsigned;
+    wire        branch_invert;
+    wire        memread;
+    wire        memwrite;
+    wire [ 1:0] memalign;
+    wire        memb;
+    wire        memh;
+    wire        memw;
+    wire        memu;
+    wire [ 3:0] rd_sel; // what gets written to register (0: ALU, 1: imm, 2: PC+4, 3: mem)
+    wire        pc_alu_sel;
 
+    decoder decoder (.i_inst            (i_imem_rdata),
+                     .o_legal           (legal)
+                     .o_halt            (halt),
+                     .o_rs1             (rs1),
+                     .o_rs2             (rs2),
+                     .o_rd              (rd),
+                     .o_immediate       (imm),
+                     .o_op1_sel         (op1_pc_sel),
+                     .o_op2_sel         (op2_imm_sel),
+                     .o_alu_opsel       (alu_opsel),
+                     .o_alu_sub         (alu_sub),
+                     .o_alu_unsigned    (alu_unsigned),
+                     .o_alu_arith       (alu_arith),
+                     .o_branch          (inst_branch),
+                     .o_jump            (inst_jump),
+                     .o_branch_equal    (branch_equal),
+                     .o_branch_unsigned (branch_unsigned),
+                     .o_branch_invert   (branch_invert),
+                     .o_dmem_ren        (o_dmem_ren), // we can pipe this directly to memory
+                     .o_dmem_wen        (o_dmem_wen), // ditto
+                     .o_dmem_memb       (memb),
+                     .o_dmem_memh       (memh),
+                     .o_dmem_memw       (memw),
+                     .o_dmem_memu       (memu),
+                     .o_rd_sel          (rd_sel),
+                     .o_pc_sel          (pc_alu_sel));
 
-    // TODO: fill in
-    decoder decoder ();
-
+    // STAGE 2.5: REGISTERS
     // TODO: fill in
     rf rf ();
 
+    // STAGE 3: EXECUTE
     // TODO: fill in
     alu alu();
 
+    // STAGE 4: MEMORY
+    // o_dmem_ren and o_dmem_wen already taken care of in STAGE 2
+    // TODO:
+    // o_dmem_addr
+    // o_dmem_wdata
+    // o_dmem_mask
+    // i_dmem_rdata
+    
+
+    // STAGE 5: WRITEBACK
+    assign wire pc_plus_4 = pc + 4;
+
+    // SEQUENTIAL LOGIC
     always @(posedge i_clk) begin
         if (i_rst) begin
             pc <= RESET_ADDR;
