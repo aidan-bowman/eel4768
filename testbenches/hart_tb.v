@@ -1,3 +1,4 @@
+```verilog
 `timescale 1ns / 1ps
 `default_nettype none
 
@@ -18,31 +19,31 @@ module hart_tb;
 
     reg i_clk;
     reg i_rst;
-    
-    reg [31:0] i_imem_rdata,
-    reg [31:0] i_dmem_rdata,
+
+    reg [31:0] i_imem_rdata;
+    reg [31:0] i_dmem_rdata;
 
     // actually used for memory
-    output wire [31:0] o_imem_raddr,
-    output wire [31:0] o_dmem_addr,
-    output wire o_dmem_ren,
-    output wire o_dmem_wen,
-    output wire [31:0] o_dmem_wdata,
-    output wire [3:0] o_dmem_mask,
+    wire [31:0] o_imem_raddr;
+    wire [31:0] o_dmem_addr;
+    wire o_dmem_ren;
+    wire o_dmem_wen;
+    wire [31:0] o_dmem_wdata;
+    wire [3:0] o_dmem_mask;
 
     // JUST testing
-    output wire o_retire_valid,
-    output wire [31:0] o_retire_inst,
-    output wire o_retire_trap,
-    output wire o_retire_halt,
-    output wire [4:0] o_retire_rs1_raddr,
-    output wire [31:0] o_retire_rs1_rdata,
-    output wire [4:0] o_retire_rs2_raddr,
-    output wire [31:0] o_retire_rs2_rdata,
-    output wire [4:0] o_retire_rd_waddr,
-    output wire [31:0] o_retire_rd_wdata,
-    output wire [31:0] o_retire_pc,
-    output wire [31:0] o_retire_next_pc
+    wire o_retire_valid;
+    wire [31:0] o_retire_inst;
+    wire o_retire_trap;
+    wire o_retire_halt;
+    wire [4:0] o_retire_rs1_raddr;
+    wire [31:0] o_retire_rs1_rdata;
+    wire [4:0] o_retire_rs2_raddr;
+    wire [31:0] o_retire_rs2_rdata;
+    wire [4:0] o_retire_rd_waddr;
+    wire [31:0] o_retire_rd_wdata;
+    wire [31:0] o_retire_pc;
+    wire [31:0] o_retire_next_pc;
 
     integer passed;
     integer failed;
@@ -52,27 +53,30 @@ module hart_tb;
     //    position -- positional connections break silently the moment someone
     //    reorders the port list.
     // ---------------------------------------------------------------------
-    hart  dut (
-        .i_imem_rdata      (i_imem_rdata),
-        .i_dmem_rdata      (i_dmem_rdata),
-        .o_imem_raddr   (o_imem_raddr)
-        .o_dmem_addr   (o_dmem_addr)
-        .o_dmem_ren   (o_dmem_ren)
-        .o_dmem_wen   (o_dmem_wen)
-        .o_dmem_wdata   (o_dmem_wdata)
-        .o_dmem_mask   (o_dmem_mask)
-        .o_retire_valid   (o_retire_valid)
-        .o_retire_inst   (o_retire_inst)
-        .o_retire_trap   (o_retire_trap)
-        .o_retire_halt   (o_retire_halt)
-        .o_retire_rs1_raddr   (o_retire_rs1_raddr)
-        .o_retire_rs1_rdata   (o_retire_rs1_rdata)
-        .o_retire_rs2_raddr   (o_retire_rs2_raddr)
-        .o_retire_rs2_rdata   (o_retire_rs2_rdata)
-        .o_retire_rd_waddr   (o_retire_rd_waddr)
-        .o_retire_rd_wdata   (o_retire_rd_wdata)
-        .o_retire_pc   (o_retire_pc)
-        .o_retire_next_pc   (o_retire_next_pc)
+
+    hart dut (
+        .i_clk               (i_clk),
+        .i_rst               (i_rst),
+        .i_imem_rdata        (i_imem_rdata),
+        .o_imem_raddr        (o_imem_raddr),
+        .o_dmem_addr         (o_dmem_addr),
+        .o_dmem_ren          (o_dmem_ren),
+        .o_dmem_wen          (o_dmem_wen),
+        .o_dmem_wdata        (o_dmem_wdata),
+        .o_dmem_mask         (o_dmem_mask),
+        .i_dmem_rdata        (i_dmem_rdata),
+        .o_retire_valid      (o_retire_valid),
+        .o_retire_inst       (o_retire_inst),
+        .o_retire_trap       (o_retire_trap),
+        .o_retire_halt       (o_retire_halt),
+        .o_retire_rs1_raddr  (o_retire_rs1_raddr),
+        .o_retire_rs1_rdata  (o_retire_rs1_rdata),
+        .o_retire_rs2_raddr  (o_retire_rs2_raddr),
+        .o_retire_rs2_rdata  (o_retire_rs2_rdata),
+        .o_retire_rd_waddr   (o_retire_rd_waddr),
+        .o_retire_rd_wdata   (o_retire_rd_wdata),
+        .o_retire_pc         (o_retire_pc),
+        .o_retire_next_pc    (o_retire_next_pc)
     );
 
     // ---------------------------------------------------------------------
@@ -83,39 +87,94 @@ module hart_tb;
     //    so an undriven output fails here instead of quietly comparing
     //    "unknown" and returning unknown.
     // ---------------------------------------------------------------------
-    task check;
-        // 64 characters. A string literal wider than the reg holding it loses
-        // its *leading* characters, silently -- so size this generously.
-        input [511:0] label;
-        input [ 31:0] t_a;
-        input [ 31:0] t_b;
-        input [  1:0] t_sel;
-        input         t_en;
-        input [ 31:0] expect_result;
-        input         expect_zero;
-        begin
-            a   = t_a;
-            b   = t_b;
-            sel = t_sel;
-            en  = t_en;
 
-            // The DUT is combinational, so one time step is enough for the
-            // new inputs to propagate. A clocked design would wait on an edge
-            // here instead: @(posedge clk).
+    // --------------------------------------------------
+    // Instruction memory
+    // --------------------------------------------------
+
+    reg [31:0] imem [0:255];
+
+    always @(*) begin
+        i_imem_rdata = imem[o_imem_raddr >> 2];
+    end
+
+
+    // --------------------------------------------------
+    // Data memory
+    // --------------------------------------------------
+
+    reg [31:0] dmem [0:255];
+
+    always @(*) begin
+        if (o_dmem_ren)
+            i_dmem_rdata = dmem[o_dmem_addr >> 2];
+        else
+            i_dmem_rdata = 32'b0;
+    end
+
+    always @(posedge i_clk) begin
+        if (o_dmem_wen) begin
+            if (o_dmem_mask[0])
+                dmem[(o_dmem_addr >> 2)][7:0] <= o_dmem_wdata[7:0];
+
+            if (o_dmem_mask[1])
+                dmem[(o_dmem_addr >> 2)][15:8] <= o_dmem_wdata[15:8];
+
+            if (o_dmem_mask[2])
+                dmem[(o_dmem_addr >> 2)][23:16] <= o_dmem_wdata[23:16];
+
+            if (o_dmem_mask[3])
+                dmem[(o_dmem_addr >> 2)][31:24] <= o_dmem_wdata[31:24];
+        end
+    end
+
+
+    // --------------------------------------------------
+    // Clock
+    // --------------------------------------------------
+
+    always #5 i_clk = ~i_clk;
+
+
+    task check;
+        input [255:0] label;
+        input [31:0] expected_inst;
+        input [31:0] expected_pc;
+        input [31:0] expected_next_pc;
+        input [4:0] expected_rd;
+        input [31:0] expected_rd_data;
+
+        begin
             #1;
 
-            if (result === expect_result && zero === expect_zero) begin
+            if (o_retire_valid === 1'b1 &&
+                o_retire_inst === expected_inst &&
+                o_retire_pc === expected_pc &&
+                o_retire_next_pc === expected_next_pc &&
+                o_retire_rd_waddr === expected_rd &&
+                o_retire_rd_wdata === expected_rd_data) begin
+
                 passed = passed + 1;
                 $display("[PASS] %0s", label);
+
             end else begin
+
                 failed = failed + 1;
                 $display("[FAIL] %0s", label);
-                $display("         a=%h b=%h sel=%b en=%b", t_a, t_b, t_sel, t_en);
-                $display("         result=%h (expected %h), zero=%b (expected %b)",
-                         result, expect_result, zero, expect_zero);
+                $display("         inst=%h (expected %h)",
+                         o_retire_inst, expected_inst);
+                $display("         pc=%h (expected %h)",
+                         o_retire_pc, expected_pc);
+                $display("         next_pc=%h (expected %h)",
+                         o_retire_next_pc, expected_next_pc);
+                $display("         rd=%d (expected %d)",
+                         o_retire_rd_waddr, expected_rd);
+                $display("         rd_data=%h (expected %h)",
+                         o_retire_rd_wdata, expected_rd_data);
             end
         end
     endtask
+
 
     // ---------------------------------------------------------------------
     // A reference model, used by the random test below.
@@ -126,106 +185,308 @@ module hart_tb;
     // copying the RTL into the model would make every test pass by
     // construction.
     // ---------------------------------------------------------------------
-    function [31:0] model_result;
-        input [31:0] m_a;
-        input [31:0] m_b;
-        input [ 1:0] m_sel;
-        input        m_en;
-        reg   [31:0] value;
-        begin
-            case (m_sel)
-                2'b00: value = m_a + m_b;
-                2'b01: value = m_a - m_b;
-                2'b10: value = m_a << m_b[4:0];
-                default: value = m_a >> m_b[4:0];
-            endcase
-            model_result = m_en ? value : 32'b0;
-        end
-    endfunction
+    //
+    // The hart tests below are directed tests instead of random tests because
+    // each test is checking a specific RISC-V instruction and its expected
+    // architectural result.
+
 
     // ---------------------------------------------------------------------
     // 4. The test program.
     // ---------------------------------------------------------------------
+
     integer i;
-    integer seed;
-    reg [31:0] rand_a;
-    reg [31:0] rand_b;
-    reg [ 1:0] rand_sel;
-    reg [31:0] expected;
 
     initial begin
         // Records a waveform of every signal in this testbench. Open it with
         // `gtkwave build/opmux.vcd` to see the inputs and outputs over time --
         // the fastest way to understand a failure the printout only summarizes.
-        $dumpfile("opmux.vcd");
-        $dumpvars(0, opmux_tb);
+        $dumpfile("hart.vcd");
+        $dumpvars(0, hart_tb);
 
         passed = 0;
         failed = 0;
 
-        $display("========== opmux testbench ==========");
+        i_clk = 0;
+        i_rst = 1;
+        i_dmem_rdata = 0;
 
-        // --- Directed tests: values worked out by hand ---------------------
-        // Every expected value below was computed on paper, not read off a
-        // simulation. That is what makes a failure meaningful.
-        $display("--- add ---");
-        check("add: 7 + 9",            32'd7, 32'd9, 2'b00, 1'b1, 32'd16,       1'b0);
-        check("add: 0 + 0 sets zero",  32'd0, 32'd0, 2'b00, 1'b1, 32'd0,        1'b1);
-        check("add: wraps past 2^32",  32'hffff_ffff, 32'd1, 2'b00, 1'b1, 32'd0, 1'b1);
+        $display("========== hart testbench ==========");
 
-        $display("--- sub ---");
-        check("sub: 9 - 7",            32'd9, 32'd7, 2'b01, 1'b1, 32'd2,        1'b0);
-        check("sub: 7 - 9 borrows",    32'd7, 32'd9, 2'b01, 1'b1, 32'hffff_fffe, 1'b0);
-        check("sub: x - x sets zero",  32'd42, 32'd42, 2'b01, 1'b1, 32'd0,      1'b1);
 
-        $display("--- shift left ---");
-        check("sll: 1 << 4",           32'd1, 32'd4, 2'b10, 1'b1, 32'd16,       1'b0);
-        check("sll: only low 5 bits of b are used",
-                                       32'd1, 32'd32, 2'b10, 1'b1, 32'd1,       1'b0);
-        check("sll: bits shifted off the top are lost",
-                                       32'h8000_0000, 32'd1, 2'b10, 1'b1, 32'd0, 1'b1);
+        // --------------------------------------------------
+        // Test 1: ADDI
+        // x1 = 5
+        // --------------------------------------------------
 
-        $display("--- shift right ---");
-        check("srl: 16 >> 4",          32'd16, 32'd4, 2'b11, 1'b1, 32'd1,       1'b0);
-        check("srl: logical, so zeros shift in",
-                                       32'hffff_ffff, 32'd28, 2'b11, 1'b1, 32'd15, 1'b0);
+        $display("--- Test 1: ADDI ---");
 
-        $display("--- enable ---");
-        check("en low forces the result to zero",
-                                       32'd7, 32'd9, 2'b00, 1'b0, 32'd0,        1'b1);
-
-        // --- Random tests: many more cases, checked against the model ------
-        // A fixed seed keeps the run reproducible: a failure you see once is a
-        // failure you can see again.
-        $display("--- random ---");
-        seed = 32'd12345;
-        for (i = 0; i < 200; i = i + 1) begin
-            // $random(seed) updates `seed` in place, so seeding once outside
-            // the loop gives the same sequence on every run.
-            rand_a   = $random(seed);
-            rand_b   = $random(seed);
-            rand_sel = $random(seed);
-            expected = model_result(rand_a, rand_b, rand_sel, 1'b1);
-
-            a   = rand_a;
-            b   = rand_b;
-            sel = rand_sel;
-            en  = 1'b1;
-            #1;
-
-            if (result !== expected || zero !== (expected == 32'b0)) begin
-                failed = failed + 1;
-                $display("[FAIL] random %0d: a=%h b=%h sel=%b", i, rand_a, rand_b, rand_sel);
-                $display("         result=%h (expected %h)", result, expected);
-            end else begin
-                passed = passed + 1;
-            end
+        for (i = 0; i < 256; i = i + 1) begin
+            imem[i] = 32'b0;
+            dmem[i] = 32'b0;
         end
-        $display("       200 random vectors checked against the model");
+
+        // addi x1, x0, 5
+        imem[0] = 32'h00500093;
+
+        // Reset
+        @(posedge i_clk);
+        @(posedge i_clk);
+        i_rst = 0;
+
+        @(posedge i_clk);
+        check("ADDI x1 = 5",
+              32'h00500093,
+              32'h00000000,
+              32'h00000004,
+              5'd1,
+              32'h00000005);
+
+
+        // --------------------------------------------------
+        // Test 2: ADD
+        // x1 = 5
+        // x2 = 7
+        // x3 = x1 + x2 = 12
+        // --------------------------------------------------
+
+        $display("--- Test 2: ADD ---");
+
+        i_rst = 1;
+
+        for (i = 0; i < 256; i = i + 1) begin
+            imem[i] = 32'b0;
+            dmem[i] = 32'b0;
+        end
+
+        // addi x1, x0, 5
+        imem[0] = 32'h00500093;
+
+        // addi x2, x0, 7
+        imem[1] = 32'h00700113;
+
+        // add x3, x1, x2
+        imem[2] = 32'h002081b3;
+
+        @(posedge i_clk);
+        @(posedge i_clk);
+        i_rst = 0;
+
+        @(posedge i_clk);
+        check("ADD x1 = 5",
+              32'h00500093,
+              32'h00000000,
+              32'h00000004,
+              5'd1,
+              32'h00000005);
+
+        @(posedge i_clk);
+        check("ADD x2 = 7",
+              32'h00700113,
+              32'h00000004,
+              32'h00000008,
+              5'd2,
+              32'h00000007);
+
+        @(posedge i_clk);
+        check("ADD x3 = 12",
+              32'h002081b3,
+              32'h00000008,
+              32'h0000000c,
+              5'd3,
+              32'h0000000c);
+
+
+        // --------------------------------------------------
+        // Test 3: SUB
+        // x1 = 10
+        // x2 = 3
+        // x3 = x1 - x2 = 7
+        // --------------------------------------------------
+
+        $display("--- Test 3: SUB ---");
+
+        i_rst = 1;
+
+        for (i = 0; i < 256; i = i + 1) begin
+            imem[i] = 32'b0;
+            dmem[i] = 32'b0;
+        end
+
+        // addi x1, x0, 10
+        imem[0] = 32'h00a00093;
+
+        // addi x2, x0, 3
+        imem[1] = 32'h00300113;
+
+        // sub x3, x1, x2
+        imem[2] = 32'h402081b3;
+
+        @(posedge i_clk);
+        @(posedge i_clk);
+        i_rst = 0;
+
+        @(posedge i_clk);
+        check("SUB x1 = 10",
+              32'h00a00093,
+              32'h00000000,
+              32'h00000004,
+              5'd1,
+              32'h0000000a);
+
+        @(posedge i_clk);
+        check("SUB x2 = 3",
+              32'h00300113,
+              32'h00000004,
+              32'h00000008,
+              5'd2,
+              32'h00000003);
+
+        @(posedge i_clk);
+        check("SUB x3 = 7",
+              32'h402081b3,
+              32'h00000008,
+              32'h0000000c,
+              5'd3,
+              32'h00000007);
+
+
+        // --------------------------------------------------
+        // Test 4: BEQ
+        // The branch should skip the instruction at PC = 12.
+        // --------------------------------------------------
+
+        $display("--- Test 4: BEQ ---");
+
+        i_rst = 1;
+
+        for (i = 0; i < 256; i = i + 1) begin
+            imem[i] = 32'b0;
+            dmem[i] = 32'b0;
+        end
+
+        // addi x1, x0, 5
+        imem[0] = 32'h00500093;
+
+        // addi x2, x0, 5
+        imem[1] = 32'h00500113;
+
+        // beq x1, x2, +8
+        imem[2] = 32'h00208463;
+
+        // This instruction should be skipped
+        // addi x3, x0, 99
+        imem[3] = 32'h06300193;
+
+        // This instruction should execute
+        // addi x3, x0, 42
+        imem[4] = 32'h02a00193;
+
+        @(posedge i_clk);
+        @(posedge i_clk);
+        i_rst = 0;
+
+        @(posedge i_clk);
+        check("BEQ x1 = 5",
+              32'h00500093,
+              32'h00000000,
+              32'h00000004,
+              5'd1,
+              32'h00000005);
+
+        @(posedge i_clk);
+        check("BEQ x2 = 5",
+              32'h00500113,
+              32'h00000004,
+              32'h00000008,
+              5'd2,
+              32'h00000005);
+
+        @(posedge i_clk);
+        check("BEQ taken",
+              32'h00208463,
+              32'h00000008,
+              32'h00000010,
+              5'd0,
+              32'h00000000);
+
+        // PC should now be 16, proving PC 12 was skipped.
+        @(posedge i_clk);
+        check("BEQ target executes",
+              32'h02a00193,
+              32'h00000010,
+              32'h00000014,
+              5'd3,
+              32'h0000002a);
+
+
+        // --------------------------------------------------
+        // Test 5: SW / LW
+        // Store 123 to memory[16], then load it into x3.
+        // --------------------------------------------------
+
+        $display("--- Test 5: SW / LW ---");
+
+        i_rst = 1;
+
+        for (i = 0; i < 256; i = i + 1) begin
+            imem[i] = 32'b0;
+            dmem[i] = 32'b0;
+        end
+
+        // addi x1, x0, 16
+        imem[0] = 32'h01000093;
+
+        // addi x2, x0, 123
+        imem[1] = 32'h07b00113;
+
+        // sw x2, 0(x1)
+        imem[2] = 32'h0020a023;
+
+        // lw x3, 0(x1)
+        imem[3] = 32'h0000a183;
+
+        @(posedge i_clk);
+        @(posedge i_clk);
+        i_rst = 0;
+
+        @(posedge i_clk);
+        check("SW/LW x1 = 16",
+              32'h01000093,
+              32'h00000000,
+              32'h00000004,
+              5'd1,
+              32'h00000010);
+
+        @(posedge i_clk);
+        check("SW/LW x2 = 123",
+              32'h07b00113,
+              32'h00000004,
+              32'h00000008,
+              5'd2,
+              32'h0000007b);
+
+        @(posedge i_clk);
+        check("SW stores x2",
+              32'h0020a023,
+              32'h00000008,
+              32'h0000000c,
+              5'd0,
+              32'h0000007b);
+
+        @(posedge i_clk);
+        check("LW loads x3 = 123",
+              32'h0000a183,
+              32'h0000000c,
+              32'h00000010,
+              5'd3,
+              32'h0000007b);
+
 
         // --- Verdict -------------------------------------------------------
         $display("=====================================");
         $display("%0d passed, %0d failed", passed, failed);
+
         if (failed == 0)
             $display("ALL TESTS PASSED");
         else
@@ -239,3 +500,4 @@ module hart_tb;
 endmodule
 
 `default_nettype wire
+```
