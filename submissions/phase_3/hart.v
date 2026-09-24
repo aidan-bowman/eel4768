@@ -1,4 +1,3 @@
-```verilog
 `default_nettype none
 
 // A hart ("hardware thread") is one complete RISC-V CPU: it fetches an
@@ -597,4 +596,3 @@ module hart #(
 endmodule
 
 `default_nettype wire
-```
