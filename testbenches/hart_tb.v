@@ -14,18 +14,35 @@
 //
 // Point 3 is the one people get wrong. An expected value copied out of the
 // design under test proves only that the design agrees with itself.
-module opmux_tb;
+module hart_tb;
 
-    // ---------------------------------------------------------------------
-    // 1. Signals: reg drives an input, wire observes an output.
-    // ---------------------------------------------------------------------
-    reg  [31:0] a;
-    reg  [31:0] b;
-    reg  [ 1:0] sel;
-    reg         en;
+    reg i_clk;
+    reg i_rst;
+    
+    reg [31:0] i_imem_rdata,
+    reg [31:0] i_dmem_rdata,
 
-    wire [31:0] result;
-    wire        zero;
+    // actually used for memory
+    output wire [31:0] o_imem_raddr,
+    output wire [31:0] o_dmem_addr,
+    output wire o_dmem_ren,
+    output wire o_dmem_wen,
+    output wire [31:0] o_dmem_wdata,
+    output wire [3:0] o_dmem_mask,
+
+    // JUST testing
+    output wire o_retire_valid,
+    output wire [31:0] o_retire_inst,
+    output wire o_retire_trap,
+    output wire o_retire_halt,
+    output wire [4:0] o_retire_rs1_raddr,
+    output wire [31:0] o_retire_rs1_rdata,
+    output wire [4:0] o_retire_rs2_raddr,
+    output wire [31:0] o_retire_rs2_rdata,
+    output wire [4:0] o_retire_rd_waddr,
+    output wire [31:0] o_retire_rd_wdata,
+    output wire [31:0] o_retire_pc,
+    output wire [31:0] o_retire_next_pc
 
     integer passed;
     integer failed;
@@ -35,13 +52,27 @@ module opmux_tb;
     //    position -- positional connections break silently the moment someone
     //    reorders the port list.
     // ---------------------------------------------------------------------
-    opmux dut (
-        .i_a      (a),
-        .i_b      (b),
-        .i_sel    (sel),
-        .i_en     (en),
-        .o_result (result),
-        .o_zero   (zero)
+    hart  dut (
+        .i_imem_rdata      (i_imem_rdata),
+        .i_dmem_rdata      (i_dmem_rdata),
+        .o_imem_raddr   (o_imem_raddr)
+        .o_dmem_addr   (o_dmem_addr)
+        .o_dmem_ren   (o_dmem_ren)
+        .o_dmem_wen   (o_dmem_wen)
+        .o_dmem_wdata   (o_dmem_wdata)
+        .o_dmem_mask   (o_dmem_mask)
+        .o_retire_valid   (o_retire_valid)
+        .o_retire_inst   (o_retire_inst)
+        .o_retire_trap   (o_retire_trap)
+        .o_retire_halt   (o_retire_halt)
+        .o_retire_rs1_raddr   (o_retire_rs1_raddr)
+        .o_retire_rs1_rdata   (o_retire_rs1_rdata)
+        .o_retire_rs2_raddr   (o_retire_rs2_raddr)
+        .o_retire_rs2_rdata   (o_retire_rs2_rdata)
+        .o_retire_rd_waddr   (o_retire_rd_waddr)
+        .o_retire_rd_wdata   (o_retire_rd_wdata)
+        .o_retire_pc   (o_retire_pc)
+        .o_retire_next_pc   (o_retire_next_pc)
     );
 
     // ---------------------------------------------------------------------
