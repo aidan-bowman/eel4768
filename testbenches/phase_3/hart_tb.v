@@ -32,8 +32,8 @@ module hart_tb;
     wire [3:0] o_dmem_mask;
 
     // JUST testing
-    wire o_retire_valid;
-    wire [31:0] o_retire_inst;
+    wire o_retire_valid;        //no
+    wire [31:0] o_retire_inst;  //no  
     wire o_retire_trap;
     wire o_retire_halt;
     wire [4:0] o_retire_rs1_raddr;
@@ -42,7 +42,7 @@ module hart_tb;
     wire [31:0] o_retire_rs2_rdata;
     wire [4:0] o_retire_rd_waddr;
     wire [31:0] o_retire_rd_wdata;
-    wire [31:0] o_retire_pc;
+    wire [31:0] o_retire_pc;    //no
     wire [31:0] o_retire_next_pc;
 
     integer passed;
@@ -137,12 +137,15 @@ module hart_tb;
 
 
     task check;
-        input [255:0] label;
-        input [31:0] expected_inst;
-        input [31:0] expected_pc;
-        input [31:0] expected_next_pc;
-        input [4:0] expected_rd;
-        input [31:0] expected_rd_data;
+		input expected_trap;
+    	input expected_halt;     
+		input [4:0] expected_rs1_raddr;
+		input [31:0] expected_rs1_rdata;
+		input [4:0] expected_rs2_raddr;
+		input [31:0] expected_rs2_rdata;
+		input [4:0] expected_rd_waddr;
+		input [31:0] expected_rd_wdata;
+		input [31:0] expected_next_pc;
 
         begin
             #1;
