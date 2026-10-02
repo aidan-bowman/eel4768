@@ -521,12 +521,11 @@ module hart
 
     wire [31:0] next_pc;
 
-    assign next_pc =
-                    (legal && jump_taken) ?
-                    jump_target :
-                    (legal && branch_taken) ?
-                    branch_target :
-                    pc_plus_4;
+    assign next_pc = (legal && jump_taken) ?
+                     jump_target :
+                     (legal && branch_taken) ?
+                     branch_target :
+                     pc_plus_4;
 
     // ================================================================
     // SEQUENTIAL LOGIC
