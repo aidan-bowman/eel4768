@@ -153,6 +153,24 @@ module hart
 
     assign o_imem_raddr = pc;
 
+    // ===
+    // REGISTER IF/ID
+    // ===
+
+    reg [31:0] if_id_pc;
+    reg [31:0] if_id_inst;
+
+    always @(posedge i_clk) begin
+        if (i_rst) begin
+            pc <= RESET_ADDR;
+            if_id_pc <= RESET_ADDR;
+            if_id_inst <= 32'h00000013;
+            
+        end else begin
+            pc <= next_pc;
+        end
+    end
+
 
     // ================================================================
     // STAGE 2: DECODE
