@@ -161,15 +161,16 @@ module hart
     reg [31:0] if_id_inst;
 
     always @(posedge i_clk) begin
-        if (i_rst) begin
-            pc <= RESET_ADDR;
-            if_id_pc <= RESET_ADDR;
-            if_id_inst <= 32'h00000013;
-            
-        end else begin
-            pc <= next_pc;
-        end
+    if (i_rst) begin
+        pc         <= RESET_ADDR;
+        if_id_pc   <= 32'b0;
+        if_id_inst <= 32'b0;
+    end else begin
+        if_id_pc   <= pc;
+        if_id_inst <= i_imem_rdata;
+        pc         <= next_pc;
     end
+end
 
 
     // ================================================================
@@ -222,7 +223,7 @@ module hart
 
 
     decoder decoder (
-                     .i_inst(i_imem_rdata),
+                     .i_inst(if_id_inst),
 
                      .o_legal(legal),
                      .o_halt(halt),
@@ -306,7 +307,7 @@ module hart
     wire        alu_eq;
     wire        alu_slt;
 
-    assign alu_op1 = op1_pc_sel ? pc : rs1_data;
+    assign alu_op1 = op1_pc_sel ? if_id_pc : rs1_data;
 
     assign alu_op2 = op2_imm_sel ? imm : rs2_data;
 
@@ -461,7 +462,7 @@ module hart
                              {{24{load_byte[7]}}, load_byte}
                              )
                             ) :
-                           rd_sel[2] ? (pc + 32'd4) :
+                           rd_sel[2] ? (if_id_pc + 32'd4) :
                            rd_sel[1] ? imm :
                            rd_sel[0] ? alu_result :
                            32'b0;
@@ -496,7 +497,7 @@ module hart
 
     wire [31:0] branch_target;
 
-    assign branch_target = pc + imm;
+    assign branch_target = if_id_pc + imm;
 
 
     // ------------------------------------------------
