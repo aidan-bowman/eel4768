@@ -128,10 +128,10 @@ module decoder (
    
    
 
-   // rs1, rs2, and rd are always in the same place (unless they don't exist, in which case don't care)
+   // rs1, rs2, and rd are always in the same place
    assign o_rd  = (is_arr | is_arr_imm | is_load | is_lui | is_auipc | is_jal | is_jalr) ? i_inst[11: 7] : 5'b00000;
-   assign o_rs1 = i_inst[19:15];
-   assign o_rs2 = i_inst[24:20];
+   assign o_rs1 = (is_arr | is_arr_imm | is_load | is_store | is_branch) ? i_inst[19:15] : 5'b00000;
+   assign o_rs2 = (is_arr | is_store | is_branch) ? i_inst[24:20] : 5'b00000;
    
    imm imm (.i_inst      (i_inst),
             .i_format    (format),
