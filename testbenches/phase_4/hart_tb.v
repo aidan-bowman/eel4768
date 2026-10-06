@@ -45,6 +45,14 @@ module hart_tb #(
     wire [31:0] o_retire_rd_wdata;
     wire [31:0] o_retire_pc;         // not used in trace
     wire [31:0] o_retire_next_pc;
+
+    // Phase 4 Update
+    wire [31:0] o_retire_dmem_addr;
+    wire        o_retire_dmem_ren;
+    wire        o_retire_dmem_wen;
+    wire  [3:0] o_retire_dmem_mask;
+    wire [31:0] o_retire_dmem_wdata;
+    wire [31:0] o_retire_dmem_rdata;
     
     integer     start;
     integer     trace_file;
@@ -80,6 +88,14 @@ module hart_tb #(
         .o_retire_rd_wdata   (o_retire_rd_wdata),
         .o_retire_pc         (o_retire_pc),
         .o_retire_next_pc    (o_retire_next_pc)
+
+        // Phase 4 Update
+        .o_retire_dmem_addr  (o_retire_dmem_addr),
+        .o_retire_dmem_ren   (o_retire_dmem_ren),
+        .o_retire_dmem_wen   (o_retire_dmem_wen),
+        .o_retire_dmem_mask  (o_retire_dmem_mask),
+        .o_retire_dmem_wdata (o_retire_dmem_wdata),
+        .o_retire_dmem_rdata (o_retire_dmem_rdata)
     );
 
     // --------------------------------------------------
@@ -89,12 +105,14 @@ module hart_tb #(
     reg [31:0] imem [0:29999];
 
     // magic incantation to load hex program
+    // Phase 4 Update, replace "hart_program.hex" with " hazard_program.hex" or "no_hazard_program.hex"
     initial begin
-        $readmemh("hart_program.hex", imem);
+        $readmemh("hazard_program.hex", imem);
     end
 
+    // Phase 4 Update (use 0x00400000 offset)
     always @(*) begin
-        i_imem_rdata = imem[o_imem_raddr >> 2];
+        i_imem_rdata = imem[(o_imem_raddr - 32'h00400000) >> 2];
     end
 
 
@@ -214,30 +232,33 @@ module hart_tb #(
     end // initial begin
 
     // this block runs testing once we start
+    // Phase 4 Update: Using !i_rst && o_retire_valid 
     always @(posedge i_clk) begin
-        if (i_rst == 0) begin
-            $fwrite(trace_file, "%08x %08x %d %d %02x %08x %02x %08x %02x %08x %d %08x %x %08x %08x\n",
-                    o_retire_pc,
-                    o_retire_inst,
-                    o_retire_trap,
-                    o_retire_halt,
-                    o_retire_rs1_raddr,
-                    o_retire_rs1_rdata,
-                    o_retire_rs2_raddr,
-                    o_retire_rs2_rdata,
-                    o_retire_rd_waddr,
-                    o_retire_rd_wdata,
-                    {o_dmem_wen, o_dmem_ren},
-                    o_dmem_addr,
-                    o_dmem_mask,
-                    o_dmem_wdata,
-                    o_retire_next_pc);
-            
-            if (o_retire_halt == 1) begin
+        if (!i_rst && o_retire_valid) begin
+            $fwrite(trace_file, "%08x %08x %d %d %02x %08x %02x %08x %02x %08x %d %08x %x %08x %08x %08x\n",
+                o_retire_pc,
+                o_retire_inst,
+                o_retire_trap,
+                o_retire_halt,
+                o_retire_rs1_raddr,
+                o_retire_rs1_rdata,
+                o_retire_rs2_raddr,
+                o_retire_rs2_rdata,
+                o_retire_rd_waddr,
+                o_retire_rd_wdata,
+                {o_retire_dmem_wen, o_retire_dmem_ren},
+                o_retire_dmem_addr,
+                o_retire_dmem_mask,
+                o_retire_dmem_wdata,
+                o_retire_next_pc,
+                o_retire_dmem_rdata);
+
+            if (o_retire_halt) begin
+                $fclose(trace_file);
                 $finish;
             end
-        end // if (i_rst == 0)
-    end // always @ (posedge i_clk)
+        end
+    end
     
     
     // this block exists to make sure we close even if the program takes a while
