@@ -179,6 +179,9 @@ end
 
     wire legal;
     wire halt;
+    
+    wire trap;
+    assign trap = !legal;
 
     wire [4:0] rs1;
     wire [4:0] rs2;
@@ -335,6 +338,7 @@ end
 
     reg       id_ex_legal;
     reg       id_ex_halt;
+    reg       id_ex_trap;
 
     always @(posedge i_clk) begin
         if (i_rst) begin
@@ -365,6 +369,7 @@ end
             id_ex_rd_sel          <= 4'b0;
             id_ex_legal           <= 1'b0;
             id_ex_halt            <= 1'b0;
+            id_ex_trap            <= 1'b0;
         end else begin
             id_ex_pc              <= if_id_pc;
             id_ex_rs1_data        <= rs1_data;
@@ -393,6 +398,7 @@ end
             id_ex_rd_sel          <= rd_sel;
             id_ex_legal           <= legal;
             id_ex_halt            <= halt;
+            id_ex_trap            <= trap;
         end
     end
     
@@ -450,6 +456,7 @@ end
 
     reg       ex_mem_legal;
     reg       ex_mem_halt;
+    reg       ex_mem_trap;
 
     always @(posedge i_clk) begin
         if (i_rst) begin
@@ -468,6 +475,7 @@ end
             ex_mem_rd_sel     <= 4'b0;
             ex_mem_legal      <= 1'b0;
             ex_mem_halt       <= 1'b0;
+            ex_mem_trap       <= 1'b0;
         end else begin
             ex_mem_alu_result <= alu_result;
             ex_mem_rs2_data   <= id_ex_rs2_data;
@@ -484,6 +492,7 @@ end
             ex_mem_rd_sel     <= id_ex_rd_sel;
             ex_mem_legal      <= id_ex_legal;
             ex_mem_halt       <= id_ex_halt;
+            ex_mem_trap       <= id_ex_trap;
         end
     end
 
@@ -638,6 +647,7 @@ end
     reg [3:0]  mem_wb_rd_sel;
     reg        mem_wb_legal;
     reg        mem_wb_halt;
+    reg        mem_wb_trap;
 
     always @(posedge i_clk) begin
         if (i_rst) begin
@@ -647,6 +657,7 @@ end
             mem_wb_rd_sel         <= 4'b0;
             mem_wb_legal          <= 1'b0;
             mem_wb_halt           <= 1'b0;
+            mem_wb_trap           <= 1'b0;
         end else begin
             mem_wb_writeback_data <= writeback_data;
             mem_wb_pc             <= ex_mem_pc;
@@ -654,6 +665,7 @@ end
             mem_wb_rd_sel         <= ex_mem_rd_sel;
             mem_wb_legal          <= ex_mem_legal;
             mem_wb_halt           <= ex_mem_halt;
+            mem_wb_trap           <= ex_mem_trap;
         end
     end
 
@@ -722,7 +734,7 @@ end
     // ------------------------------------------------
     // Next PC
     // ------------------------------------------------
-
+    
     wire [31:0] pc_plus_4;
 
     assign pc_plus_4 = pc + 32'd4;
@@ -730,9 +742,9 @@ end
 
     wire [31:0] next_pc;
 
-    assign next_pc = (legal && jump_taken) ?
+    assign next_pc = jump_taken ?
                      jump_target :
-                     (legal && branch_taken) ?
+                     branch_taken ?
                      branch_target :
                      pc_plus_4;
 
@@ -740,7 +752,8 @@ end
     // SEQUENTIAL LOGIC
     // ================================================================
 
-
+    assign o_retire_trap = mem_wb_trap;
+  
 endmodule
 
 `default_nettype wire
