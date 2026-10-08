@@ -320,6 +320,8 @@ end
     reg [31:0] id_ex_pc;
     reg [31:0] id_ex_rs1_data;
     reg [31:0] id_ex_rs2_data;
+    reg [4:0] id_ex_rs1;
+    reg [4:0] id_ex_rs2;
     reg [31:0] id_ex_imm;
 
     reg [4:0] id_ex_rd;
@@ -358,6 +360,8 @@ end
             id_ex_pc              <= 32'b0;
             id_ex_rs1_data        <= 32'b0;
             id_ex_rs2_data        <= 32'b0;
+            id_ex_rs1              <= 5'd0;
+            id_ex_rs2              <= 5'd0;
             id_ex_imm             <= 32'b0;
             id_ex_rd              <= 5'd0;
             id_ex_alu_opsel       <= 3'b0;
@@ -387,6 +391,8 @@ end
             id_ex_pc              <= if_id_pc;
             id_ex_rs1_data        <= rs1_data;
             id_ex_rs2_data        <= rs2_data;
+            id_ex_rs1             <= rs1;
+            id_ex_rs2             <= rs2;
             id_ex_imm             <= imm;
             id_ex_rd              <= rd;
             id_ex_alu_opsel       <= alu_opsel;
@@ -416,15 +422,72 @@ end
     end
     
     // ================================================================
-    // STAGE 3: EXECUTE
-    // ================================================================
+		// STAGE 3: EXECUTE
+		// ================================================================
 
-    wire [31:0] alu_op1;
-    wire [31:0] alu_op2;
+		wire [31:0] forward_rs1_data;
+		wire [31:0] forward_rs2_data;
 
-    wire [31:0] alu_result;
-    wire        alu_eq;
-    wire        alu_slt;
+		wire forward_ex_rs1;
+		wire forward_ex_rs2;
+		wire forward_wb_rs1;
+		wire forward_wb_rs2;
+
+		wire [31:0] alu_op1;
+		wire [31:0] alu_op2;
+
+		wire [31:0] alu_result;
+		wire        alu_eq;
+		wire        alu_slt;
+
+
+		// EX/MEM forwarding
+
+		assign forward_ex_rs1 =
+    		FWD_EN &&
+    		(ex_mem_rd != 5'd0) &&
+    		ex_mem_legal &&
+    		!ex_mem_halt &&
+    		!ex_mem_memread &&
+    		(ex_mem_rd == id_ex_rs1);
+
+		assign forward_ex_rs2 =
+    		FWD_EN &&
+    		(ex_mem_rd != 5'd0) &&
+    		ex_mem_legal &&
+    		!ex_mem_halt &&
+    		!ex_mem_memread &&
+    		(ex_mem_rd == id_ex_rs2);
+
+
+		// MEM/WB forwarding
+
+		assign forward_wb_rs1 =
+    		FWD_EN &&
+    		(mem_wb_rd != 5'd0) &&
+    		mem_wb_legal &&
+    		!mem_wb_halt &&
+    		(mem_wb_rd == id_ex_rs1);
+
+		assign forward_wb_rs2 =
+    		FWD_EN &&
+    		(mem_wb_rd != 5'd0) &&
+    		mem_wb_legal &&
+    		!mem_wb_halt &&
+    		(mem_wb_rd == id_ex_rs2);
+
+
+		// Forwarding multiplexers
+
+		assign forward_rs1_data =
+    		forward_ex_rs1 ? ex_mem_alu_result :
+    		forward_wb_rs1 ? mem_wb_writeback_data :
+        		              id_ex_rs1_data;
+
+		assign forward_rs2_data =
+    		forward_ex_rs2 ? ex_mem_alu_result :
+    		forward_wb_rs2 ? mem_wb_writeback_data :
+    		                  id_ex_rs2_data;
 
     assign alu_op1 = id_ex_op1_pc_sel ? id_ex_pc : id_ex_rs1_data;
 
