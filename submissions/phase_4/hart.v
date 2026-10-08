@@ -318,6 +318,7 @@ module hart
     // ================================================================
 
     reg [31:0] id_ex_pc;
+	reg [31:0] id_ex_inst;
     reg [31:0] id_ex_rs1_data;
     reg [31:0] id_ex_rs2_data;
     reg [4:0]  id_ex_rs1;
@@ -358,6 +359,7 @@ module hart
     always @(posedge i_clk) begin
         if (i_rst) begin
             id_ex_pc              <= 32'b0;
+			id_ex_inst            <= 32'b0;
             id_ex_rs1_data        <= 32'b0;
             id_ex_rs2_data        <= 32'b0;
             id_ex_rs1              <= 5'd0;
@@ -389,6 +391,7 @@ module hart
             id_ex_trap            <= 1'b0;
         end else begin
             id_ex_pc              <= if_id_pc;
+			id_ex_inst            <= if_id_inst;
             id_ex_rs1_data        <= rs1_data;
             id_ex_rs2_data        <= rs2_data;
             id_ex_rs1             <= rs1;
