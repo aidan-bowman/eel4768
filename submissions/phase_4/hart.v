@@ -172,12 +172,14 @@ module hart
 
     reg [31:0] if_id_pc;
     reg [31:0] if_id_inst;
+	reg if_id_valid;
 
     always @(posedge i_clk) begin
         if (i_rst) begin
             pc         <= RESET_ADDR;
             if_id_pc   <= 32'b0;
             if_id_inst <= 32'b0;
+			if_id_valid <= 1'b0;
         end else begin
             if_id_pc   <= pc;
             if_id_inst <= i_imem_rdata;
@@ -319,6 +321,7 @@ module hart
 
     reg [31:0] id_ex_pc;
 	reg [31:0] id_ex_inst;
+	reg id_ex_valid;
     reg [31:0] id_ex_rs1_data;
     reg [31:0] id_ex_rs2_data;
     reg [4:0]  id_ex_rs1;
@@ -520,6 +523,7 @@ module hart
 	reg [31:0] ex_mem_rs2_data;
 	reg [31:0] ex_mem_rs1_data;
 	reg [31:0] ex_mem_pc;
+	reg ex_mem_valid;
 	reg [31:0] ex_mem_next_pc;
 	reg [31:0] ex_mem_inst;
 	reg [31:0] ex_mem_imm;
@@ -541,7 +545,6 @@ module hart
     reg        ex_mem_legal;
     reg        ex_mem_halt;
     reg        ex_mem_trap;
-	wire [31:0] ex_next_pc;
 
     always @(posedge i_clk) begin
         if (i_rst) begin
@@ -740,6 +743,7 @@ module hart
 	reg [31:0] mem_wb_pc;
 	reg [31:0] mem_wb_next_pc;
 	reg [31:0] mem_wb_inst;
+	reg mem_wb_valid;
 	
 	reg [4:0]  mem_wb_rs1;
 	reg [4:0]  mem_wb_rs2;
@@ -899,6 +903,29 @@ module hart
 
     assign o_retire_trap = mem_wb_trap;
 	assign o_retire_next_pc = mem_wb_next_pc;
+	
+	assign o_retire_inst       = mem_wb_inst;
+	assign o_retire_halt       = mem_wb_halt;
+
+	assign o_retire_rs1_raddr  = mem_wb_rs1;
+	assign o_retire_rs2_raddr  = mem_wb_rs2;
+	assign o_retire_rs1_rdata  = mem_wb_rs1_data;
+	assign o_retire_rs2_rdata  = mem_wb_rs2_data;
+
+	assign o_retire_rd_waddr =
+    	(mem_wb_legal && !mem_wb_halt && !mem_wb_trap)
+    	? mem_wb_rd : 5'd0;
+
+	assign o_retire_rd_wdata  = mem_wb_writeback_data;
+
+	assign o_retire_dmem_addr  = mem_wb_dmem_addr;
+	assign o_retire_dmem_mask  = mem_wb_dmem_mask;
+	assign o_retire_dmem_ren   = mem_wb_dmem_ren;
+	assign o_retire_dmem_wen   = mem_wb_dmem_wen;
+	assign o_retire_dmem_rdata = mem_wb_dmem_rdata;
+	assign o_retire_dmem_wdata = mem_wb_dmem_wdata;
+
+	assign o_retire_pc         = mem_wb_pc;
     
 endmodule
 
