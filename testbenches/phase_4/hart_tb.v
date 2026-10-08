@@ -87,7 +87,7 @@ module hart_tb #(
         .o_retire_rd_waddr   (o_retire_rd_waddr),
         .o_retire_rd_wdata   (o_retire_rd_wdata),
         .o_retire_pc         (o_retire_pc),
-        .o_retire_next_pc    (o_retire_next_pc)
+        .o_retire_next_pc    (o_retire_next_pc),
 
         // Phase 4 Update
         .o_retire_dmem_addr  (o_retire_dmem_addr),
@@ -111,8 +111,14 @@ module hart_tb #(
     end
 
     // Phase 4 Update (use 0x00400000 offset)
-    always @(*) begin
-        i_imem_rdata = imem[(o_imem_raddr - 32'h00400000) >> 2];
+    always @* begin
+        i_imem_rdata = 32'b0;
+        // sanity check
+        if (o_imem_raddr >= 32'h00400000 &&
+            o_imem_raddr <  32'h00400000 + 4*30000 &&
+            o_imem_raddr[1:0] == 2'b00) begin
+            i_imem_rdata = imem[(o_imem_raddr - 32'h00400000) >> 2];
+        end
     end
 
 
@@ -222,7 +228,6 @@ module hart_tb #(
         
         i_clk = 0;
         i_rst = 1;
-        i_dmem_rdata = 0;
 
         // make sure we reset
         @(posedge i_clk);
