@@ -339,6 +339,7 @@ module hart
     // ================================================================
 
     reg [31:0] id_ex_pc;
+	reg [31:0] id_ex_inst;
     reg [31:0] id_ex_rs1_data;
     reg [31:0] id_ex_rs2_data;
     reg [4:0]  id_ex_rs1;
@@ -379,6 +380,7 @@ module hart
     always @(posedge i_clk) begin
         if (i_rst | id_nop) begin
             id_ex_pc              <= 32'b0;
+			id_ex_inst            <= 32'b0;
             id_ex_rs1_data        <= 32'b0;
             id_ex_rs2_data        <= 32'b0;
             id_ex_rs1             <= 5'd0;
@@ -410,6 +412,7 @@ module hart
             id_ex_trap            <= 1'b0;
         end else begin // if o_id_nop
             id_ex_pc              <= if_id_pc;
+			id_ex_inst            <= if_id_inst;
             id_ex_rs1_data        <= rs1_data;
             id_ex_rs2_data        <= rs2_data;
             id_ex_rs1             <= rs1;
@@ -586,11 +589,16 @@ module hart
     // ================================================================
 
     reg [31:0] ex_mem_alu_result;
-    reg [31:0] ex_mem_rs2_data;
-    reg [31:0] ex_mem_pc;
-    reg [31:0] ex_mem_imm;
-
-    reg [4:0]  ex_mem_rd;
+	reg [31:0] ex_mem_rs2_data;
+	reg [31:0] ex_mem_rs1_data;
+	reg [31:0] ex_mem_pc;
+	reg [31:0] ex_mem_next_pc;
+	reg [31:0] ex_mem_inst;
+	reg [31:0] ex_mem_imm;
+	
+	reg [4:0]  ex_mem_rs1;
+	reg [4:0]  ex_mem_rs2;
+	reg [4:0]  ex_mem_rd;
 
     reg        ex_mem_memread;
     reg        ex_mem_memwrite;
@@ -605,13 +613,19 @@ module hart
     reg        ex_mem_legal;
     reg        ex_mem_halt;
     reg        ex_mem_trap;
+	wire [31:0] ex_next_pc;
 
     always @(posedge i_clk) begin
         if (i_rst) begin
             ex_mem_alu_result <= 32'b0;
             ex_mem_rs2_data   <= 32'b0;
             ex_mem_pc         <= 32'b0;
+			ex_mem_next_pc      <= 32'b0;
             ex_mem_imm        <= 32'b0;
+			ex_mem_inst       <= 32'b0;
+			ex_mem_rs1_data   <= 32'b0;
+			ex_mem_rs1        <= 5'd0;
+			ex_mem_rs2        <= 5'd0;
             ex_mem_rd         <= 5'd0;
             ex_mem_memread    <= 1'b0;
             ex_mem_memwrite   <= 1'b0;
@@ -628,6 +642,11 @@ module hart
             ex_mem_alu_result <= alu_result;
             ex_mem_rs2_data   <= id_ex_rs2_data;
             ex_mem_pc         <= id_ex_pc;
+			ex_mem_next_pc      <= ex_next_pc;
+			ex_mem_inst       <= id_ex_inst;
+			ex_mem_rs1_data   <= id_ex_rs1_data;
+			ex_mem_rs1        <= id_ex_rs1;
+			ex_mem_rs2        <= id_ex_rs2;
             ex_mem_imm        <= id_ex_imm;
             ex_mem_rd         <= id_ex_rd;
             ex_mem_memread    <= id_ex_memread;
@@ -790,27 +809,67 @@ module hart
     // ================================================================
 
     reg [31:0] mem_wb_writeback_data;
-    reg [31:0] mem_wb_pc;
-    reg [4:0]  mem_wb_rd;
-    reg [3:0]  mem_wb_rd_sel;
-    reg        mem_wb_legal;
-    reg        mem_wb_halt;
-    reg        mem_wb_trap;
-
+	reg [31:0] mem_wb_pc;
+	reg [31:0] mem_wb_next_pc;
+	reg [31:0] mem_wb_inst;
+	
+	reg [4:0]  mem_wb_rs1;
+	reg [4:0]  mem_wb_rs2;
+	reg [31:0] mem_wb_rs1_data;
+	reg [31:0] mem_wb_rs2_data;
+	
+	reg [4:0]  mem_wb_rd;
+	reg [3:0]  mem_wb_rd_sel;
+	
+	reg [31:0] mem_wb_dmem_addr;
+	reg [3:0]  mem_wb_dmem_mask;
+	reg        mem_wb_dmem_ren;
+	reg        mem_wb_dmem_wen;
+	reg [31:0] mem_wb_dmem_rdata;
+	reg [31:0] mem_wb_dmem_wdata;
+	
+	reg        mem_wb_legal;
+	reg        mem_wb_halt;
+	reg        mem_wb_trap;
+	
     always @(posedge i_clk) begin
         if (i_rst) begin
             mem_wb_writeback_data <= 32'b0;
             mem_wb_pc             <= 32'b0;
+			mem_wb_next_pc      <= 32'b0;
+			mem_wb_inst         <= 32'b0;
+			mem_wb_rs1          <= 5'd0;
+			mem_wb_rs2          <= 5'd0;
+			mem_wb_rs1_data     <= 32'b0;
+			mem_wb_rs2_data     <= 32'b0;
             mem_wb_rd             <= 5'd0;
             mem_wb_rd_sel         <= 4'b0;
+			mem_wb_dmem_addr    <= 32'b0;
+			mem_wb_dmem_mask    <= 4'b0;
+			mem_wb_dmem_ren     <= 1'b0;
+			mem_wb_dmem_wen     <= 1'b0;
+			mem_wb_dmem_rdata   <= 32'b0;
+			mem_wb_dmem_wdata   <= 32'b0;
             mem_wb_legal          <= 1'b0;
             mem_wb_halt           <= 1'b0;
             mem_wb_trap           <= 1'b0;
         end else begin
             mem_wb_writeback_data <= writeback_data;
             mem_wb_pc             <= ex_mem_pc;
+			mem_wb_next_pc        <= ex_mem_next_pc;
+			mem_wb_inst           <= ex_mem_inst;
+    		mem_wb_rs1            <= ex_mem_rs1;
+    		mem_wb_rs2            <= ex_mem_rs2;
+    		mem_wb_rs1_data       <= ex_mem_rs1_data;
+   			mem_wb_rs2_data       <= ex_mem_rs2_data;
             mem_wb_rd             <= ex_mem_rd;
             mem_wb_rd_sel         <= ex_mem_rd_sel;
+			mem_wb_dmem_addr      <= o_dmem_addr;
+    		mem_wb_dmem_mask      <= o_dmem_mask;
+    		mem_wb_dmem_ren       <= o_dmem_ren;
+    		mem_wb_dmem_wen       <= o_dmem_wen;
+    		mem_wb_dmem_rdata     <= i_dmem_rdata;
+    		mem_wb_dmem_wdata     <= o_dmem_wdata;
             mem_wb_legal          <= ex_mem_legal;
             mem_wb_halt           <= ex_mem_halt;
             mem_wb_trap           <= ex_mem_trap;
@@ -818,6 +877,8 @@ module hart
     end
 
     assign o_retire_trap = mem_wb_trap;
+    assign o_retire_trap = mem_wb_trap;
+	assign o_retire_next_pc = mem_wb_next_pc;
 endmodule
 
 // ##################################
