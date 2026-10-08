@@ -11,13 +11,10 @@ module decoder (
     // Indicates that the instruction is an ebreak and should halt execution.
     output wire        o_halt,
     // First source register address.
-    // For instructions that do not use a source register, this is effectively
-    // a don't care because reading unused registers does not have any side
-    // effects (and we don't care about power usage, really).
+    // Set to 0 when we don't use this for hazard detection
     output wire [ 4:0] o_rs1,
     // Second source register address.
-    // Similarly to o_rs1, this is a don't care for instructions that do not
-    // read a (second) source register.
+    // Ditto with rs2
     output wire [ 4:0] o_rs2,
     // Destination register address.
     // For instructions that do not write to a register, this must be set to
