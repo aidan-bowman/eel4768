@@ -189,6 +189,7 @@ module hart
     // =============================================================
 
     reg [31:0] if_id_pc;
+    reg [31:0] if_id_nextpc; // for retire interface
     reg [31:0] if_id_inst;
 	reg if_id_valid;
 
@@ -197,7 +198,8 @@ module hart
             pc         <= RESET_ADDR;
             if_id_pc   <= 32'b0;
             if_id_inst <= 32'b0;
-			      if_id_valid <= 1'b0;
+            if_id_nextpc <= 32'b0;
+			if_id_valid <= 1'b0;
         end else if (if_hold) begin
     		// Hold PC and IF/ID during a stall.
 		end else begin
@@ -208,10 +210,12 @@ module hart
         		if_id_pc    <= 32'b0;
         		if_id_inst  <= 32'b0;
         		if_id_valid <= 1'b0;
+            if_id_nextpc <= 32'b0;
     		end else begin
         		if_id_pc    <= pc;
         		if_id_inst  <= i_imem_rdata;
         		if_id_valid <= 1'b1;
+            if_id_nextpc <= next_pc;
     		end
 		end
 
@@ -368,6 +372,7 @@ module hart
     // ================================================================
 
     reg [31:0] id_ex_pc;
+    reg [31:0] id_ex_nextpc; // for retire interface
 	reg [31:0] id_ex_inst;
 	reg id_ex_valid;
     reg [31:0] id_ex_rs1_data;
@@ -410,6 +415,7 @@ module hart
     always @(posedge i_clk) begin
         if (i_rst | id_nop) begin
             id_ex_pc              <= 32'b0;
+            id_ex_nextpc          <= 32'b0;
 			id_ex_inst            <= 32'b0;
 			id_ex_valid 		  <= 1'b0;
             id_ex_rs1_data        <= 32'b0;
@@ -443,6 +449,7 @@ module hart
             id_ex_trap            <= 1'b0;
         end else begin // if o_id_nop
             id_ex_pc              <= if_id_pc;
+            id_ex_nextpc          <= if_id_nextpc;
 			id_ex_inst            <= if_id_inst;
 			id_ex_valid 		  <= if_id_valid;
             id_ex_rs1_data <= uses_rs1 ? rs1_data : 32'd0;
@@ -631,9 +638,9 @@ module hart
 	reg [31:0] ex_mem_rs2_data;
 	reg [31:0] ex_mem_rs1_data;
 	reg [31:0] ex_mem_pc;
-	reg [31:0] ex_mem_next_pc;
+	reg [31:0] ex_mem_nextpc;
+	reg        ex_mem_valid;
 	reg [31:0] ex_mem_inst;
-	reg ex_mem_valid;
 	reg [31:0] ex_mem_imm;
 	
 	reg [4:0]  ex_mem_rs1;
@@ -659,7 +666,7 @@ module hart
             ex_mem_alu_result <= 32'b0;
             ex_mem_rs2_data   <= 32'b0;
             ex_mem_pc         <= 32'b0;
-			ex_mem_next_pc    <= 32'b0;
+			ex_mem_nextpc      <= 32'b0;
             ex_mem_imm        <= 32'b0;
 			ex_mem_inst       <= 32'b0;
 			ex_mem_valid 	  <= 1'b0;
@@ -682,7 +689,7 @@ module hart
             ex_mem_alu_result <= alu_result;
             ex_mem_rs2_data   <= id_ex_rs2_data;
             ex_mem_pc         <= id_ex_pc;
-			ex_mem_next_pc      <= ex_next_pc;
+			ex_mem_nextpc     <= id_ex_nextpc;
 			ex_mem_inst       <= id_ex_inst;
 			ex_mem_valid 	  <= id_ex_valid;
 			ex_mem_rs1_data   <= id_ex_rs1_data;
