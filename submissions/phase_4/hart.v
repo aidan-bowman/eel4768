@@ -172,15 +172,16 @@ module hart
     reg [31:0] if_id_inst;
 
     always @(posedge i_clk) begin
-        if (i_rst) begin
-            pc <= RESET_ADDR;
-            if_id_pc <= RESET_ADDR;
-            if_id_inst <= 32'h00000013;
-            
-        end else begin
-            pc <= next_pc;
-        end
+    if (i_rst) begin
+        pc         <= RESET_ADDR;
+        if_id_pc   <= 32'b0;
+        if_id_inst <= 32'b0;
+    end else begin
+        if_id_pc   <= pc;
+        if_id_inst <= i_imem_rdata;
+        pc         <= next_pc;
     end
+end
 
 
     // ================================================================
@@ -189,6 +190,9 @@ module hart
 
     wire legal;
     wire halt;
+    
+    wire trap;
+    assign trap = !legal;
 
     wire [4:0] rs1;
     wire [4:0] rs2;
@@ -233,7 +237,7 @@ module hart
 
 
     decoder decoder (
-                     .i_inst(i_imem_rdata),
+                     .i_inst(if_id_inst),
 
                      .o_legal(legal),
                      .o_halt(halt),
@@ -287,7 +291,7 @@ module hart
     // A misaligned or illegal instruction must not write a register.
     // Driving x0 to the write address is how Phase 3 disables writes.
     wire [4:0]  rf_rd_waddr =
-                (legal && !halt) ? rd : 5'd0;
+                (mem_wb_legal && !mem_wb_halt) ? mem_wb_rd : 5'd0;
 
 
     rf #(
@@ -303,9 +307,112 @@ module hart
                .o_rs2_rdata(rs2_data),
 
                .i_rd_waddr(rf_rd_waddr),
-               .i_rd_wdata(writeback_data)
+               .i_rd_wdata(mem_wb_writeback_data)
                );
 
+    
+    // ================================================================
+    // REGISTER ID/EX
+    // ================================================================
+
+    reg [31:0] id_ex_pc;
+    reg [31:0] id_ex_rs1_data;
+    reg [31:0] id_ex_rs2_data;
+    reg [31:0] id_ex_imm;
+
+    reg [4:0] id_ex_rd;
+    reg [2:0] id_ex_alu_opsel;
+    reg       id_ex_alu_sub;
+    reg       id_ex_alu_unsigned;
+    reg       id_ex_alu_arith;
+
+    reg       id_ex_op1_pc_sel;
+    reg       id_ex_op2_imm_sel;
+
+    reg       id_ex_branch;
+    reg       id_ex_branch_equal;
+    reg       id_ex_branch_unsigned;
+    reg       id_ex_branch_invert;
+
+    reg       id_ex_jump;
+    reg       id_ex_pc_alu_sel;
+
+    reg       id_ex_memread;
+    reg       id_ex_memwrite;
+    reg [1:0] id_ex_memalign;
+    reg       id_ex_memb;
+    reg       id_ex_memh;
+    reg       id_ex_memw;
+    reg       id_ex_memu;
+
+    reg [3:0] id_ex_rd_sel;
+
+    reg       id_ex_legal;
+    reg       id_ex_halt;
+    reg       id_ex_trap;
+
+    always @(posedge i_clk) begin
+        if (i_rst) begin
+            id_ex_pc              <= 32'b0;
+            id_ex_rs1_data        <= 32'b0;
+            id_ex_rs2_data        <= 32'b0;
+            id_ex_imm             <= 32'b0;
+            id_ex_rd              <= 5'd0;
+            id_ex_alu_opsel       <= 3'b0;
+            id_ex_alu_sub         <= 1'b0;
+            id_ex_alu_unsigned    <= 1'b0;
+            id_ex_alu_arith       <= 1'b0;
+            id_ex_op1_pc_sel      <= 1'b0;
+            id_ex_op2_imm_sel     <= 1'b0;
+            id_ex_branch          <= 1'b0;
+            id_ex_branch_equal    <= 1'b0;
+            id_ex_branch_unsigned <= 1'b0;
+            id_ex_branch_invert   <= 1'b0;
+            id_ex_jump            <= 1'b0;
+            id_ex_pc_alu_sel      <= 1'b0;
+            id_ex_memread         <= 1'b0;
+            id_ex_memwrite        <= 1'b0;
+            id_ex_memalign        <= 2'b0;
+            id_ex_memb            <= 1'b0;
+            id_ex_memh            <= 1'b0;
+            id_ex_memw            <= 1'b0;
+            id_ex_memu            <= 1'b0;
+            id_ex_rd_sel          <= 4'b0;
+            id_ex_legal           <= 1'b0;
+            id_ex_halt            <= 1'b0;
+            id_ex_trap            <= 1'b0;
+        end else begin
+            id_ex_pc              <= if_id_pc;
+            id_ex_rs1_data        <= rs1_data;
+            id_ex_rs2_data        <= rs2_data;
+            id_ex_imm             <= imm;
+            id_ex_rd              <= rd;
+            id_ex_alu_opsel       <= alu_opsel;
+            id_ex_alu_sub         <= alu_sub;
+            id_ex_alu_unsigned    <= alu_unsigned;
+            id_ex_alu_arith       <= alu_arith;
+            id_ex_op1_pc_sel      <= op1_pc_sel;
+            id_ex_op2_imm_sel     <= op2_imm_sel;
+            id_ex_branch          <= inst_branch;
+            id_ex_branch_equal    <= branch_equal;
+            id_ex_branch_unsigned <= branch_unsigned;
+            id_ex_branch_invert   <= branch_invert;
+            id_ex_jump            <= inst_jump;
+            id_ex_pc_alu_sel      <= pc_alu_sel;
+            id_ex_memread         <= decoder_dmem_ren;
+            id_ex_memwrite        <= decoder_dmem_wen;
+            id_ex_memalign        <= memalign;
+            id_ex_memb            <= memb;
+            id_ex_memh            <= memh;
+            id_ex_memw            <= memw;
+            id_ex_memu            <= memu;
+            id_ex_rd_sel          <= rd_sel;
+            id_ex_legal           <= legal;
+            id_ex_halt            <= halt;
+            id_ex_trap            <= trap;
+        end
+    end
+    
     // ================================================================
     // STAGE 3: EXECUTE
     // ================================================================
@@ -317,16 +424,16 @@ module hart
     wire        alu_eq;
     wire        alu_slt;
 
-    assign alu_op1 = op1_pc_sel ? pc : rs1_data;
+    assign alu_op1 = id_ex_op1_pc_sel ? id_ex_pc : id_ex_rs1_data;
 
-    assign alu_op2 = op2_imm_sel ? imm : rs2_data;
+    assign alu_op2 = id_ex_op2_imm_sel ? id_ex_imm : id_ex_rs2_data;
 
 
     alu alu (
-             .i_opsel(alu_opsel),
-             .i_sub(alu_sub),
-             .i_unsigned(alu_unsigned),
-             .i_arith(alu_arith),
+             .i_opsel(id_ex_alu_opsel),
+             .i_sub(id_ex_alu_sub),
+             .i_unsigned(id_ex_alu_unsigned),
+             .i_arith(id_ex_alu_arith),
 
              .i_op1(alu_op1),
              .i_op2(alu_op2),
@@ -338,13 +445,76 @@ module hart
 
 
     // ================================================================
+    // REGISTER EX/MEM
+    // ================================================================
+
+    reg [31:0] ex_mem_alu_result;
+    reg [31:0] ex_mem_rs2_data;
+    reg [31:0] ex_mem_pc;
+    reg [31:0] ex_mem_imm;
+
+    reg [4:0] ex_mem_rd;
+
+    reg       ex_mem_memread;
+    reg       ex_mem_memwrite;
+    reg [1:0] ex_mem_memalign;
+    reg       ex_mem_memb;
+    reg       ex_mem_memh;
+    reg       ex_mem_memw;
+    reg       ex_mem_memu;
+
+    reg [3:0] ex_mem_rd_sel;
+
+    reg       ex_mem_legal;
+    reg       ex_mem_halt;
+    reg       ex_mem_trap;
+
+    always @(posedge i_clk) begin
+        if (i_rst) begin
+            ex_mem_alu_result <= 32'b0;
+            ex_mem_rs2_data   <= 32'b0;
+            ex_mem_pc         <= 32'b0;
+            ex_mem_imm        <= 32'b0;
+            ex_mem_rd         <= 5'd0;
+            ex_mem_memread    <= 1'b0;
+            ex_mem_memwrite   <= 1'b0;
+            ex_mem_memalign   <= 2'b0;
+            ex_mem_memb       <= 1'b0;
+            ex_mem_memh       <= 1'b0;
+            ex_mem_memw       <= 1'b0;
+            ex_mem_memu       <= 1'b0;
+            ex_mem_rd_sel     <= 4'b0;
+            ex_mem_legal      <= 1'b0;
+            ex_mem_halt       <= 1'b0;
+            ex_mem_trap       <= 1'b0;
+        end else begin
+            ex_mem_alu_result <= alu_result;
+            ex_mem_rs2_data   <= id_ex_rs2_data;
+            ex_mem_pc         <= id_ex_pc;
+            ex_mem_imm        <= id_ex_imm;
+            ex_mem_rd         <= id_ex_rd;
+            ex_mem_memread    <= id_ex_memread;
+            ex_mem_memwrite   <= id_ex_memwrite;
+            ex_mem_memalign   <= id_ex_memalign;
+            ex_mem_memb       <= id_ex_memb;
+            ex_mem_memh       <= id_ex_memh;
+            ex_mem_memw       <= id_ex_memw;
+            ex_mem_memu       <= id_ex_memu;
+            ex_mem_rd_sel     <= id_ex_rd_sel;
+            ex_mem_legal      <= id_ex_legal;
+            ex_mem_halt       <= id_ex_halt;
+            ex_mem_trap       <= id_ex_trap;
+        end
+    end
+
+    // ================================================================
     // STAGE 4: MEMORY
     // ================================================================
 
     // The ALU calculates the byte address.
     wire [31:0] dmem_byte_addr;
 
-    assign dmem_byte_addr = alu_result;
+    assign dmem_byte_addr = ex_mem_alu_result;
 
     // External memory always receives a word-aligned address.
     assign o_dmem_addr = {dmem_byte_addr[31:2], 2'b00};
@@ -367,10 +537,10 @@ module hart
     wire dmem_misaligned;
 
     assign dmem_misaligned =
-                            (decoder_dmem_ren | decoder_dmem_wen) &&
+                            (ex_mem_memread | ex_mem_memwrite) &&
                             (
-                             (memalign[0] && dmem_byte_addr[0]) ||
-                             (memalign[1] &&
+                             (ex_mem_memalign[0] && dmem_byte_addr[0]) ||
+                             (ex_mem_memalign[1] &&
                               (dmem_byte_addr[1] | dmem_byte_addr[0]))
                              );
 
@@ -378,15 +548,15 @@ module hart
     // Illegal instructions and misaligned accesses have no memory side
     // effects.
     assign o_dmem_ren =
-                       decoder_dmem_ren &&
-                       legal &&
-                       !halt &&
+                       ex_mem_memread &&
+                       ex_mem_legal &&
+                       !ex_mem_halt &&
                        !dmem_misaligned;
 
     assign o_dmem_wen =
-                       decoder_dmem_wen &&
-                       legal &&
-                       !halt &&
+                       ex_mem_memwrite &&
+                       ex_mem_legal &&
+                       !ex_mem_halt &&
                        !dmem_misaligned;
 
 
@@ -410,8 +580,8 @@ module hart
                       4'b0000;
 
     assign o_dmem_mask =
-                        memw ? 4'b1111 :
-                        memh ? half_mask :
+                        ex_mem_memw ? 4'b1111 :
+                        ex_mem_memh ? half_mask :
                         byte_mask;
 
 
@@ -420,19 +590,19 @@ module hart
     // ------------------------------------------------
 
     assign o_dmem_wdata =
-                         memw ? rs2_data :
-                         memh ?
+                         ex_mem_memw ? ex_mem_rs2_data :
+                         ex_mem_memh ?
                          (
-                          (dmem_byte_addr[1:0] == 2'b00) ? {16'b0, rs2_data[15:0]} :
-                          (dmem_byte_addr[1:0] == 2'b01) ? {8'b0, rs2_data[15:0], 8'b0} :
-                          (dmem_byte_addr[1:0] == 2'b10) ? {rs2_data[15:0], 16'b0} :
+                          (dmem_byte_addr[1:0] == 2'b00) ? {16'b0, ex_mem_rs2_data[15:0]} :
+                          (dmem_byte_addr[1:0] == 2'b01) ? {8'b0, ex_mem_rs2_data[15:0], 8'b0} :
+                          (dmem_byte_addr[1:0] == 2'b10) ? {ex_mem_rs2_data[15:0], 16'b0} :
                           32'b0
                           ) :
                          (
-                          (dmem_byte_addr[1:0] == 2'b00) ? {24'b0, rs2_data[7:0]} :
-                          (dmem_byte_addr[1:0] == 2'b01) ? {16'b0, rs2_data[7:0], 8'b0} :
-                          (dmem_byte_addr[1:0] == 2'b10) ? {8'b0, rs2_data[7:0], 16'b0} :
-                          {rs2_data[7:0], 24'b0}
+                          (dmem_byte_addr[1:0] == 2'b00) ? {24'b0, ex_mem_rs2_data[7:0]} :
+                          (dmem_byte_addr[1:0] == 2'b01) ? {16'b0, ex_mem_rs2_data[7:0], 8'b0} :
+                          (dmem_byte_addr[1:0] == 2'b10) ? {8'b0, ex_mem_rs2_data[7:0], 16'b0} :
+                          {ex_mem_rs2_data[7:0], 24'b0}
                           );
 
 
@@ -457,25 +627,58 @@ module hart
 
 
     assign writeback_data =
-                           rd_sel[3] ?
+                           ex_mem_rd_sel[3] ?
                            (
-                            memw ? i_dmem_rdata :
-                            memh ?
+                            ex_mem_memw ? i_dmem_rdata :
+                            ex_mem_memh ?
                             (
-                             memu ?
+                             ex_mem_memu ?
                              {16'b0, load_half} :
                              {{16{load_half[15]}}, load_half}
                              ) :
                             (
-                             memu ?
+                             ex_mem_memu ?
                              {24'b0, load_byte} :
                              {{24{load_byte[7]}}, load_byte}
                              )
                             ) :
-                           rd_sel[2] ? (pc + 32'd4) :
-                           rd_sel[1] ? imm :
-                           rd_sel[0] ? alu_result :
+                           ex_mem_rd_sel[2] ? (ex_mem_pc + 32'd4) :
+                           ex_mem_rd_sel[1] ? ex_mem_imm :
+                           ex_mem_rd_sel[0] ? ex_mem_alu_result :
                            32'b0;
+
+
+    // ================================================================
+    // REGISTER MEM/WB
+    // ================================================================
+
+    reg [31:0] mem_wb_writeback_data;
+    reg [31:0] mem_wb_pc;
+    reg [4:0]  mem_wb_rd;
+    reg [3:0]  mem_wb_rd_sel;
+    reg        mem_wb_legal;
+    reg        mem_wb_halt;
+    reg        mem_wb_trap;
+
+    always @(posedge i_clk) begin
+        if (i_rst) begin
+            mem_wb_writeback_data <= 32'b0;
+            mem_wb_pc             <= 32'b0;
+            mem_wb_rd             <= 5'd0;
+            mem_wb_rd_sel         <= 4'b0;
+            mem_wb_legal          <= 1'b0;
+            mem_wb_halt           <= 1'b0;
+            mem_wb_trap           <= 1'b0;
+        end else begin
+            mem_wb_writeback_data <= writeback_data;
+            mem_wb_pc             <= ex_mem_pc;
+            mem_wb_rd             <= ex_mem_rd;
+            mem_wb_rd_sel         <= ex_mem_rd_sel;
+            mem_wb_legal          <= ex_mem_legal;
+            mem_wb_halt           <= ex_mem_halt;
+            mem_wb_trap           <= ex_mem_trap;
+        end
+    end
 
 
     // ================================================================
@@ -490,15 +693,15 @@ module hart
     wire branch_condition;
 
     assign branch_condition =
-                             branch_equal ? alu_eq : alu_slt;
+                             id_ex_branch_equal ? alu_eq : alu_slt;
 
 
     wire branch_taken;
 
     assign branch_taken =
-                         legal &&
-                         inst_branch &&
-                         (branch_condition ^ branch_invert);
+                         id_ex_legal &&
+                         id_ex_branch &&
+                         (branch_condition ^ id_ex_branch_invert);
 
 
     // ------------------------------------------------
@@ -507,7 +710,7 @@ module hart
 
     wire [31:0] branch_target;
 
-    assign branch_target = pc + imm;
+    assign branch_target = id_ex_pc + id_ex_imm;
 
 
     // ------------------------------------------------
@@ -526,23 +729,23 @@ module hart
     wire [31:0] jump_target;
 
     assign jump_target =
-                        pc_alu_sel ?
+                        id_ex_pc_alu_sel ?
                         {alu_result[31:1], 1'b0} :
-                        (pc + imm);
+                        (id_ex_pc + id_ex_imm);
 
 
     wire jump_taken;
 
     assign jump_taken =
-                       legal &&
-                       inst_jump &&
-                       !halt;
+                       id_ex_legal &&
+                       id_ex_jump &&
+                       !id_ex_halt;
 
 
     // ------------------------------------------------
     // Next PC
     // ------------------------------------------------
-
+    
     wire [31:0] pc_plus_4;
 
     assign pc_plus_4 = pc + 32'd4;
@@ -550,9 +753,9 @@ module hart
 
     wire [31:0] next_pc;
 
-    assign next_pc = (legal && jump_taken) ?
+    assign next_pc = jump_taken ?
                      jump_target :
-                     (legal && branch_taken) ?
+                     branch_taken ?
                      branch_target :
                      pc_plus_4;
 
@@ -560,14 +763,8 @@ module hart
     // SEQUENTIAL LOGIC
     // ================================================================
 
-    always @(posedge i_clk) begin
-        if (i_rst) begin
-            pc <= RESET_ADDR;
-        end else begin
-            pc <= next_pc;
-        end
-    end
-
+    assign o_retire_trap = mem_wb_trap;
+  
 endmodule
 
 // ##################################
