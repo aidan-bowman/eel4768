@@ -102,16 +102,16 @@ module hart_tb #(
     // Instruction memory
     // --------------------------------------------------
 
-    reg [31:0] imem [0:29999];
+    reg [31:0] imem [0:65535];
 
     // magic incantation to load hex program
     // Phase 4 Update, replace "hart_program.hex" with " hazard_program.hex" or "no_hazard_program.hex"
     initial begin
-        $readmemh("hazard_program.hex", imem);
+        $readmemh("no_hazard_program.hex", imem);
     end
 
     // Phase 4 Update (use 0x00400000 offset)
-    always @* begin
+    always @(o_imem_raddr) begin
         i_imem_rdata = 32'b0;
         // sanity check
         if (o_imem_raddr >= 32'h00400000 &&
@@ -133,6 +133,7 @@ module hart_tb #(
     integer r;
     integer w;
     reg     found;
+    reg     mem_changed;
     reg [31:0] write_addr;
     reg [31:0] write_data;
 
@@ -140,20 +141,19 @@ module hart_tb #(
         mem_count = 0;
     end
 
+    initial mem_changed = 1'b0;
+    
     // Combinational read
-    always @(*) begin
+    always @(o_dmem_ren or o_dmem_addr or mem_changed) begin
         i_dmem_rdata = 32'b0;
 
-        if (!o_dmem_ren) begin
-            i_dmem_rdata = 32'b0;
-        end
-        else begin
+        if (o_dmem_ren) begin
             for (r = 0; r < mem_count; r = r + 1) begin
                 if (mem_addr[r] == (o_dmem_addr >> 2))
                     i_dmem_rdata = mem_data[r];
             end
         end
-    end // always @ (*)
+    end
 
     // Clocked write
     always @(posedge i_clk) begin
@@ -202,6 +202,8 @@ module hart_tb #(
                 mem_count           = mem_count + 1;
             end // else: !if(found)
         end // if (o_dmem_wen)
+        
+        mem_changed = ~mem_changed; // update read
     end // always @ (posedge i_clk)
 
 
