@@ -489,9 +489,9 @@ end
     		forward_wb_rs2 ? mem_wb_writeback_data :
     		                  id_ex_rs2_data;
 
-    assign alu_op1 = id_ex_op1_pc_sel ? id_ex_pc : id_ex_rs1_data;
+    assign alu_op1 = id_ex_op1_pc_sel ? id_ex_pc : forward_rs1_data;
 
-    assign alu_op2 = id_ex_op2_imm_sel ? id_ex_imm : id_ex_rs2_data;
+    assign alu_op2 = id_ex_op2_imm_sel ? id_ex_imm : forward_rs2_data;
 
 
     alu alu (
