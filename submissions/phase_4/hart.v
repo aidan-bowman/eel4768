@@ -188,6 +188,7 @@ module hart
     // =============================================================
 
     reg [31:0] if_id_pc;
+    reg [31:0] if_id_nextpc; // for retire interface
     reg [31:0] if_id_inst;
 
     always @(posedge i_clk) begin
@@ -195,12 +196,14 @@ module hart
             pc         <= RESET_ADDR;
             if_id_pc   <= 32'b0;
             if_id_inst <= 32'b0;
+            if_id_nextpc <= 32'b4;
         end else if (if_hold) begin
             // don't update anything
         end else begin
             if_id_pc   <= pc;
             if_id_inst <= i_imem_rdata;
             pc         <= next_pc;
+            if_id_nextpc <= next_pc;
         end
     end
 
@@ -339,6 +342,7 @@ module hart
     // ================================================================
 
     reg [31:0] id_ex_pc;
+    reg [31:0] id_ex_nextpc; // for retire interface
 	reg [31:0] id_ex_inst;
     reg [31:0] id_ex_rs1_data;
     reg [31:0] id_ex_rs2_data;
@@ -380,6 +384,7 @@ module hart
     always @(posedge i_clk) begin
         if (i_rst | id_nop) begin
             id_ex_pc              <= 32'b0;
+            id_ex_nextpc          <= 32'b0;
 			id_ex_inst            <= 32'b0;
             id_ex_rs1_data        <= 32'b0;
             id_ex_rs2_data        <= 32'b0;
@@ -412,6 +417,7 @@ module hart
             id_ex_trap            <= 1'b0;
         end else begin // if o_id_nop
             id_ex_pc              <= if_id_pc;
+            id_ex_nextpc          <= if_id_nextpc;
 			id_ex_inst            <= if_id_inst;
             id_ex_rs1_data        <= rs1_data;
             id_ex_rs2_data        <= rs2_data;
@@ -592,7 +598,7 @@ module hart
 	reg [31:0] ex_mem_rs2_data;
 	reg [31:0] ex_mem_rs1_data;
 	reg [31:0] ex_mem_pc;
-	reg [31:0] ex_mem_next_pc;
+	reg [31:0] ex_mem_nextpc;
 	reg [31:0] ex_mem_inst;
 	reg [31:0] ex_mem_imm;
 	
@@ -613,14 +619,13 @@ module hart
     reg        ex_mem_legal;
     reg        ex_mem_halt;
     reg        ex_mem_trap;
-	wire [31:0] ex_next_pc;
 
     always @(posedge i_clk) begin
         if (i_rst) begin
             ex_mem_alu_result <= 32'b0;
             ex_mem_rs2_data   <= 32'b0;
             ex_mem_pc         <= 32'b0;
-			ex_mem_next_pc      <= 32'b0;
+			ex_mem_nextpc      <= 32'b0;
             ex_mem_imm        <= 32'b0;
 			ex_mem_inst       <= 32'b0;
 			ex_mem_rs1_data   <= 32'b0;
@@ -642,7 +647,7 @@ module hart
             ex_mem_alu_result <= alu_result;
             ex_mem_rs2_data   <= id_ex_rs2_data;
             ex_mem_pc         <= id_ex_pc;
-			ex_mem_next_pc      <= ex_next_pc;
+			ex_mem_nextpc     <= id_ex_nextpc;
 			ex_mem_inst       <= id_ex_inst;
 			ex_mem_rs1_data   <= id_ex_rs1_data;
 			ex_mem_rs1        <= id_ex_rs1;
