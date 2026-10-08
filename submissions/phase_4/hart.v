@@ -139,36 +139,53 @@ module hart
 `endif
        );
 
-    /*
-     // TODO: finish
-     hazardctrl hazardctrl (
-     .i_id_rs1(), // fill in our wires in parenthesis
-     .i_id_rs2(),
-     .i_id_store(),
-     .i_ex_rd(),
-     .i_ex_rs1(),
-     .i_ex_rs2(),
-     .i_ex_load(),
-     .i_ex_btaken(),
-     .i_mem_rd(),
-     .i_wb_rd(),
-     //outputs
-     .o_if_hold(),
-     .o_id_nop(),
-     );
-     */
+    // ================================================================
+    // HAZARD CONTROL
+    // ================================================================
+    // this module reads signals from throughout the CPU
+    // and gens signals that (ideally) stop hazards from being genned
+    
+    hazardctrl #(
+                 .FWD_EN(FWD_EN),
+                 .BYPASS_EN(BYPASS_EN)
+                 )
+    hazardctrl (
+                .i_id_rs1(rs1), // fill in our wires in parenthesis
+                .i_id_rs2(rs2),
+                .i_id_store(decoder_dmem_ren),
+                .i_ex_rd(id_ex_rd),
+                .i_ex_rs1(id_ex_rs1),
+                .i_ex_rs2(id_ex_rs2),
+                .i_ex_load(id_ex_memwrite),
+                .i_ex_btaken(ex_branchtaken),
+                .i_mem_rd(ex_mem_rd),
+                .i_wb_rd(ex_mem_rd),
+                //outputs
+                .o_if_hold(if_hold),
+                .o_id_nop(id_nop)
+                );
     
     // ================================================================
-    // STAGE 1: FETCH INSTR
+    // STAGE 1: FETCH INSTRUCTION
     // ================================================================
 
-    reg [31:0] pc;
+    reg  [31:0] pc;
+    wire        if_hold; // see hazardctrl
+    wire [31:0] pc_plus_4;
+    wire [31:0] next_pc;
 
     assign o_imem_raddr = pc;
-
-    // ===
+    
+    assign pc_plus_4 = pc + 32'd4;
+    
+    assign next_pc = if_hold ? pc :
+                     jump_taken ? jump_target :
+                     ex_branchtaken ? ex_branchtarget :
+                     pc_plus_4;
+    
+    // =============================================================
     // REGISTER IF/ID
-    // ===
+    // =============================================================
 
     reg [31:0] if_id_pc;
     reg [31:0] if_id_inst;
@@ -178,6 +195,8 @@ module hart
             pc         <= RESET_ADDR;
             if_id_pc   <= 32'b0;
             if_id_inst <= 32'b0;
+        end else if (if_hold) begin
+            // don't update anything
         end else begin
             if_id_pc   <= pc;
             if_id_inst <= i_imem_rdata;
@@ -195,6 +214,8 @@ module hart
     
     wire trap;
     assign trap = !legal;
+
+    wire        id_nop; // see hazardctrl
 
     wire [4:0] rs1;
     wire [4:0] rs2;
@@ -356,12 +377,12 @@ module hart
     reg        id_ex_trap;
 
     always @(posedge i_clk) begin
-        if (i_rst) begin
+        if (i_rst | id_nop) begin
             id_ex_pc              <= 32'b0;
             id_ex_rs1_data        <= 32'b0;
             id_ex_rs2_data        <= 32'b0;
-            id_ex_rs1              <= 5'd0;
-            id_ex_rs2              <= 5'd0;
+            id_ex_rs1             <= 5'd0;
+            id_ex_rs2             <= 5'd0;
             id_ex_imm             <= 32'b0;
             id_ex_rd              <= 5'd0;
             id_ex_alu_opsel       <= 3'b0;
@@ -387,7 +408,7 @@ module hart
             id_ex_legal           <= 1'b0;
             id_ex_halt            <= 1'b0;
             id_ex_trap            <= 1'b0;
-        end else begin
+        end else begin // if o_id_nop
             id_ex_pc              <= if_id_pc;
             id_ex_rs1_data        <= rs1_data;
             id_ex_rs2_data        <= rs2_data;
@@ -507,6 +528,57 @@ module hart
              .o_eq(alu_eq),
              .o_slt(alu_slt)
              );
+
+    // ================================================================
+    // BRANCH / JUMP
+    // ================================================================
+
+    // For BEQ/BNE the ALU equality output is used.
+    // For BLT/BGE/BLTU/BGEU the ALU less-than output is used.
+    //
+    // The decoder supplies i_unsigned to the ALU for unsigned branches.
+
+    wire ex_branchcondition;
+    wire ex_branchtaken;
+    wire [31:0] ex_branchtarget;
+    
+    assign ex_branchcondition = id_ex_branch_equal ? alu_eq : alu_slt;
+
+    assign ex_branchtaken = id_ex_legal && id_ex_branch &&
+                         (ex_branchcondition ^ id_ex_branch_invert);
+
+    assign ex_branchtarget = id_ex_pc + id_ex_imm;
+
+
+
+
+    // ------------------------------------------------
+    // Jump target
+    // ------------------------------------------------
+
+    // JAL:
+    //     PC + immediate
+    //
+    // JALR:
+    //     rs1 + immediate, with bit 0 cleared.
+    //
+    // alu_result already contains rs1 + immediate for JALR because the
+    // decoder selects rs1 and the immediate for the ALU.
+
+    wire [31:0] jump_target;
+
+    assign jump_target =
+                        id_ex_pc_alu_sel ?
+                        {alu_result[31:1], 1'b0} :
+                        (id_ex_pc + id_ex_imm);
+
+
+    wire jump_taken;
+
+    assign jump_taken =
+                       id_ex_legal &&
+                       id_ex_jump &&
+                       !id_ex_halt;
 
 
     // ================================================================
@@ -745,91 +817,7 @@ module hart
         end
     end
 
-
-    // ================================================================
-    // BRANCH / JUMP
-    // ================================================================
-
-    // For BEQ/BNE the ALU equality output is used.
-    // For BLT/BGE/BLTU/BGEU the ALU less-than output is used.
-    //
-    // The decoder supplies i_unsigned to the ALU for unsigned branches.
-
-    wire branch_condition;
-
-    assign branch_condition =
-                             id_ex_branch_equal ? alu_eq : alu_slt;
-
-
-    wire branch_taken;
-
-    assign branch_taken =
-                         id_ex_legal &&
-                         id_ex_branch &&
-                         (branch_condition ^ id_ex_branch_invert);
-
-
-    // ------------------------------------------------
-    // Branch target
-    // ------------------------------------------------
-
-    wire [31:0] branch_target;
-
-    assign branch_target = id_ex_pc + id_ex_imm;
-
-
-    // ------------------------------------------------
-    // Jump target
-    // ------------------------------------------------
-
-    // JAL:
-    //     PC + immediate
-    //
-    // JALR:
-    //     rs1 + immediate, with bit 0 cleared.
-    //
-    // alu_result already contains rs1 + immediate for JALR because the
-    // decoder selects rs1 and the immediate for the ALU.
-
-    wire [31:0] jump_target;
-
-    assign jump_target =
-                        id_ex_pc_alu_sel ?
-                        {alu_result[31:1], 1'b0} :
-                        (id_ex_pc + id_ex_imm);
-
-
-    wire jump_taken;
-
-    assign jump_taken =
-                       id_ex_legal &&
-                       id_ex_jump &&
-                       !id_ex_halt;
-
-
-    // ------------------------------------------------
-    // Next PC
-    // ------------------------------------------------
-    
-    wire [31:0] pc_plus_4;
-
-    assign pc_plus_4 = pc + 32'd4;
-
-
-    wire [31:0] next_pc;
-
-    assign next_pc = jump_taken ?
-                     jump_target :
-                     branch_taken ?
-                     branch_target :
-                     pc_plus_4;
-
-    // ================================================================
-    // SEQUENTIAL LOGIC
-    // ================================================================
-
     assign o_retire_trap = mem_wb_trap;
-    
 endmodule
 
 // ##################################
