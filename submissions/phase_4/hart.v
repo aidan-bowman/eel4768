@@ -131,8 +131,8 @@ module hart
        // the instruction memory address that the instruction was fetched from.
         output wire [31:0] o_retire_pc,
        // the next program counter after the instruction is retired. For most
-       // instructions, this is `o_retire_pc + 4`, but must be the branch or jump
-       // target for *taken* branches and jumps.
+       // instructions, this is `o_retire_pc + 4`, but must be the branch or 
+       // target for *taken* branches and s.
         output wire [31:0] o_retire_next_pc
 `ifdef RISCV_FORMAL
        , RVFI_OUTPUTS,
@@ -150,16 +150,17 @@ module hart
                  .BYPASS_EN(BYPASS_EN)
                  )
     hazardctrl (
-                .i_id_rs1(rs1), // fill in our wires in parenthesis
+                // fill in our wires in parenthesis
+				.i_id_rs1(rs1), 
                 .i_id_rs2(rs2),
-                .i_id_store(decoder_dmem_ren),
+				.i_id_store(decoder_dmem_wen),
                 .i_ex_rd(id_ex_rd),
                 .i_ex_rs1(id_ex_rs1),
                 .i_ex_rs2(id_ex_rs2),
-                .i_ex_load(id_ex_memwrite),
+				.i_ex_load(id_ex_memread),
                 .i_ex_btaken(ex_branchtaken),
                 .i_mem_rd(ex_mem_rd),
-                .i_wb_rd(ex_mem_rd),
+				.i_wb_rd(ex_wb_rd),
                 //outputs
                 .o_if_hold(if_hold),
                 .o_id_nop(id_nop)
@@ -200,15 +201,23 @@ module hart
             if_id_nextpc <= 32'b0;
 			if_id_valid <= 1'b0;
         end else if (if_hold) begin
-            // don't update anything
-        end else begin
-            if_id_pc   <= pc;
-            if_id_inst <= i_imem_rdata;
-            pc         <= next_pc;
-            if_id_nextpc <= next_pc;
-        end
-    end
+    		// Hold PC and IF/ID during a stall.
+		end else begin
+    		pc <= next_pc;
 
+    		if (jump_taken || ex_branchtaken) begin
+        		// Flush the instruction fetched from the wrong path.
+        		if_id_pc    <= 32'b0;
+        		if_id_inst  <= 32'b0;
+        		if_id_valid <= 1'b0;
+            if_id_nextpc <= 32'b0;
+    		end else begin
+        		if_id_pc    <= pc;
+        		if_id_inst  <= i_imem_rdata;
+        		if_id_valid <= 1'b1;
+            if_id_nextpc <= next_pc;
+    		end
+		end
 
     // ================================================================
     // STAGE 2: DECODE
@@ -306,6 +315,25 @@ module hart
                      .o_pc_sel(pc_alu_sel)
                      );
 
+		wire [6:0] opcode;
+		wire uses_rs1;
+		wire uses_rs2;
+
+		assign opcode = if_id_inst[6:0];
+
+		assign uses_rs1 =
+    		(opcode == 7'b0110011) || // R-type ALU
+    		(opcode == 7'b0010011) || // I-type ALU
+    		(opcode == 7'b0000011) || // Load
+    		(opcode == 7'b0100011) || // Store
+    		(opcode == 7'b1100011) || // Branch
+    		(opcode == 7'b1100111);   // JALR
+
+		assign uses_rs2 =
+    		(opcode == 7'b0110011) || // R-type ALU
+    		(opcode == 7'b0100011) || // Store
+    		(opcode == 7'b1100011);   // Branch
+
 
     // ================================================================
     // STAGE 2.5: REGISTERS
@@ -389,6 +417,7 @@ module hart
             id_ex_pc              <= 32'b0;
             id_ex_nextpc          <= 32'b0;
 			id_ex_inst            <= 32'b0;
+			id_ex_valid 		  <= 1'b0;
             id_ex_rs1_data        <= 32'b0;
             id_ex_rs2_data        <= 32'b0;
             id_ex_rs1             <= 5'd0;
@@ -422,10 +451,11 @@ module hart
             id_ex_pc              <= if_id_pc;
             id_ex_nextpc          <= if_id_nextpc;
 			id_ex_inst            <= if_id_inst;
-            id_ex_rs1_data        <= rs1_data;
-            id_ex_rs2_data        <= rs2_data;
-            id_ex_rs1             <= rs1;
-            id_ex_rs2             <= rs2;
+			id_ex_valid 		  <= if_id_valid;
+            id_ex_rs1_data <= uses_rs1 ? rs1_data : 32'd0;
+			id_ex_rs2_data <= uses_rs2 ? rs2_data : 32'd0;
+			id_ex_rs1      <= uses_rs1 ? rs1 : 5'd0;
+			id_ex_rs2      <= uses_rs2 ? rs2 : 5'd0;
             id_ex_imm             <= imm;
             id_ex_rd              <= rd;
             id_ex_alu_opsel       <= alu_opsel;
@@ -592,6 +622,13 @@ module hart
                        id_ex_jump &&
                        !id_ex_halt;
 
+	wire [31:0] ex_next_pc;
+
+	assign ex_next_pc =
+    	jump_taken       ? jump_target :
+    	ex_branchtaken   ? ex_branchtarget :
+        	               (id_ex_pc + 32'd4);
+
 
     // ================================================================
     // REGISTER EX/MEM
@@ -603,7 +640,6 @@ module hart
 	reg [31:0] ex_mem_pc;
 	reg [31:0] ex_mem_nextpc;
 	reg        ex_mem_valid;
-	reg [31:0] ex_mem_next_pc;
 	reg [31:0] ex_mem_inst;
 	reg [31:0] ex_mem_imm;
 	
@@ -633,6 +669,7 @@ module hart
 			ex_mem_nextpc      <= 32'b0;
             ex_mem_imm        <= 32'b0;
 			ex_mem_inst       <= 32'b0;
+			ex_mem_valid 	  <= 1'b0;
 			ex_mem_rs1_data   <= 32'b0;
 			ex_mem_rs1        <= 5'd0;
 			ex_mem_rs2        <= 5'd0;
@@ -654,6 +691,7 @@ module hart
             ex_mem_pc         <= id_ex_pc;
 			ex_mem_nextpc     <= id_ex_nextpc;
 			ex_mem_inst       <= id_ex_inst;
+			ex_mem_valid 	  <= id_ex_valid;
 			ex_mem_rs1_data   <= id_ex_rs1_data;
 			ex_mem_rs1        <= id_ex_rs1;
 			ex_mem_rs2        <= id_ex_rs2;
@@ -849,6 +887,7 @@ module hart
             mem_wb_pc             <= 32'b0;
 			mem_wb_next_pc      <= 32'b0;
 			mem_wb_inst         <= 32'b0;
+			mem_wb_valid 		<= 1'b0;
 			mem_wb_rs1          <= 5'd0;
 			mem_wb_rs2          <= 5'd0;
 			mem_wb_rs1_data     <= 32'b0;
@@ -869,6 +908,7 @@ module hart
             mem_wb_pc             <= ex_mem_pc;
 			mem_wb_next_pc        <= ex_mem_next_pc;
 			mem_wb_inst           <= ex_mem_inst;
+			mem_wb_valid 		  <= ex_mem_valid;
     		mem_wb_rs1            <= ex_mem_rs1;
     		mem_wb_rs2            <= ex_mem_rs2;
     		mem_wb_rs1_data       <= ex_mem_rs1_data;
@@ -888,10 +928,10 @@ module hart
     end
 
     assign o_retire_trap = mem_wb_trap;
-    assign o_retire_trap = mem_wb_trap;
 	assign o_retire_next_pc = mem_wb_next_pc;
 	
 	assign o_retire_inst       = mem_wb_inst;
+	assign o_retire_valid 	   = mem_wb_valid;
 	assign o_retire_halt       = mem_wb_halt;
 
 	assign o_retire_rs1_raddr  = mem_wb_rs1;
