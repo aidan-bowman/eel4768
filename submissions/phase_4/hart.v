@@ -9,7 +9,7 @@ module hart
     // When set, register file bypassing is enabled.              
     parameter BYPASS_EN = 1
     // What instruction is used for NOPs
-    parameter NOP_INST = 32'h00000013; // addi zero, zero, 0
+//    parameter NOP_INST = 32'h00000013; // addi zero, zero, 0
     ) (
        // Global clock.
        input wire         i_clk,
@@ -138,7 +138,8 @@ module hart
        , RVFI_OUTPUTS,
 `endif
        );
-    
+
+    /*
     // TODO: finish
     hazardctrl hazardctrl (
                            .i_id_rs1(), // fill in our wires in parenthesis
@@ -155,6 +156,7 @@ module hart
                            .o_if_hold(),
                            .o_id_nop(),
                            );
+     */
     
     // ================================================================
     // STAGE 1: FETCH INSTR
@@ -774,8 +776,8 @@ endmodule
 // we don't handle FORWARDING or BYPASSING...
 module hazardctrl
   #(
-    parameter FWD_EN = 1,              // we need to know if our machine will handle forwarding
-    parameter BYPASS_EN = 1,           // or bypassing, because if we can't, we need to stall
+    parameter FWD_EN = 1,   // we need to know if our machine will handle forwarding
+    parameter BYPASS_EN = 1 // or bypassing, because if we can't, we need to stall
     )
     (
      // INPUTS:
@@ -798,7 +800,7 @@ module hazardctrl
      // IF
      output wire      o_if_hold,    // stall PC and disable IF/ID write
      // ID
-     output wire      o_id_nop,     // bubble/flush
+     output wire      o_id_nop     // bubble/flush
      );
 
     // data hazards
@@ -841,13 +843,14 @@ module hazardctrl
     generate
         // see g_none first for baseline
         if (FWD_EN && BYPASS_EN) begin : g_bypass_forwarding
+            // we can't forward from a load...
+            // UNLESS we're doing load->store where store is storing loaded value
             // only reason we CAN'T forward is
             // load->store where store needs to use loaded value as offset
             // that is, load rd == store rs1
             // if load rd == store rs2, we can just mem->mem forward
-            assign stall = i_id_store &
-                           i_ex_load &
-                           ex_match_rs1;
+            assign stall = i_ex_load & (ex_match_rs1 |
+                                        (ex_match_rs2 & i_id_store));
         end else if (FWD_EN) begin : g_forwarding
             // this should honestly not be a case that happens
             // so let's just "throw an error"
