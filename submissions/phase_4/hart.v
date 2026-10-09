@@ -318,8 +318,7 @@ module hart
 
     // A misaligned or illegal instruction must not write a register.
     // Driving x0 to the write address is how Phase 3 disables writes.
-    wire [4:0]  rf_rd_waddr =
-                (mem_wb_legal && !mem_wb_halt) ? mem_wb_rd : 5'd0;
+    wire [4:0]  rf_rd_waddr = (mem_wb_legal & !mem_wb_halt & mem_wb_valid & !mem_wb_trap) ? mem_wb_rd : 5'd0;
 
 
     rf #(
@@ -474,53 +473,47 @@ module hart
 	wire        alu_slt;
 
 
-	// EX/MEM forwarding
+	// EX->EX forwarding
 
-	assign forward_ex_rs1 =
-    		               FWD_EN &&
-    		               (ex_mem_rd != 5'd0) &&
-    		               ex_mem_legal &&
-    		               !ex_mem_halt &&
-    		               !ex_mem_memread &&
-    		               (ex_mem_rd == id_ex_rs1);
+	assign forward_ex_rs1 = FWD_EN &&
+    		                (ex_mem_rd != 5'd0) &&
+    		                ex_mem_legal &&
+    		                !ex_mem_halt &&
+    		                !ex_mem_memread &&
+    		                (ex_mem_rd == id_ex_rs1);
 
-	assign forward_ex_rs2 =
-    		               FWD_EN &&
-    		               (ex_mem_rd != 5'd0) &&
-    		               ex_mem_legal &&
-    		               !ex_mem_halt &&
-    		               !ex_mem_memread &&
-    		               (ex_mem_rd == id_ex_rs2);
+	assign forward_ex_rs2 = FWD_EN &&
+    		                (ex_mem_rd != 5'd0) &&
+    		                ex_mem_legal &&
+    		                !ex_mem_halt &&
+    		                !ex_mem_memread &&
+    		                (ex_mem_rd == id_ex_rs2);
 
 
-	// MEM/WB forwarding
+	// MEM->EX forwarding
 
-	assign forward_wb_rs1 =
-    		               FWD_EN &&
-    		               (mem_wb_rd != 5'd0) &&
-    		               mem_wb_legal &&
-    		               !mem_wb_halt &&
-    		               (mem_wb_rd == id_ex_rs1);
+	assign forward_wb_rs1 = FWD_EN &&
+    		                (mem_wb_rd != 5'd0) &&
+    		                mem_wb_legal &&
+    		                !mem_wb_halt &&
+    		                (mem_wb_rd == id_ex_rs1);
 
-	assign forward_wb_rs2 =
-    		               FWD_EN &&
-    		               (mem_wb_rd != 5'd0) &&
-    		               mem_wb_legal &&
-    		               !mem_wb_halt &&
-    		               (mem_wb_rd == id_ex_rs2);
+	assign forward_wb_rs2 = FWD_EN &&
+    		                (mem_wb_rd != 5'd0) &&
+    		                mem_wb_legal &&
+    		                !mem_wb_halt &&
+    		                (mem_wb_rd == id_ex_rs2);
 
 
 	// Forwarding multiplexers
 
-	assign forward_rs1_data =
-    		                 forward_ex_rs1 ? ex_mem_alu_result :
-    		                 forward_wb_rs1 ? mem_wb_writeback_data :
-        		             id_ex_rs1_data;
+	assign forward_rs1_data = forward_ex_rs1 ? ex_mem_alu_result :
+    		                  forward_wb_rs1 ? mem_wb_writeback_data :
+        		              id_ex_rs1_data;
 
-	assign forward_rs2_data =
-    		                 forward_ex_rs2 ? ex_mem_alu_result :
-    		                 forward_wb_rs2 ? mem_wb_writeback_data :
-    		                 id_ex_rs2_data;
+	assign forward_rs2_data = forward_ex_rs2 ? ex_mem_alu_result :
+    		                  forward_wb_rs2 ? mem_wb_writeback_data :
+    		                  id_ex_rs2_data;
 
     assign alu_op1 = id_ex_op1_pc_sel ? id_ex_pc : forward_rs1_data;
 
@@ -654,9 +647,9 @@ module hart
             ex_mem_pc         <= id_ex_pc;
 			ex_mem_nextpc     <= id_ex_nextpc;
 			ex_mem_inst       <= id_ex_inst;
-			ex_mem_rs1_data   <= id_ex_rs1_data;
-			ex_mem_rs1        <= id_ex_rs1;
-			ex_mem_rs2        <= id_ex_rs2;
+			ex_mem_rs1_data   <= forward_rs1_data;
+			ex_mem_rs1        <= alu_op1;
+			ex_mem_rs2        <= forward_rs2_data;
             ex_mem_imm        <= id_ex_imm;
             ex_mem_rd         <= id_ex_rd;
             ex_mem_memread    <= id_ex_memread;
@@ -676,10 +669,24 @@ module hart
     // ================================================================
     // STAGE 4: MEMORY
     // ================================================================
+    
+    // MEM->MEM forwarding
+    wire [31:0] mem_forward_rs2_data;
+    wire        mem_forward_wb_rs2;
 
-    // The ALU calculates the byte address.
+    assign mem_forward_wb_rs2 = FWD EN &&
+                                (mem_wb_rd != 5'd0) &&
+                                mem_wb_legal &&
+                                !mem_wb_halt &&
+                                (mem_wb_rd == ex_mem_rs2);
+
+
+	// Forwarding multiplexers
+
+    assign mem_forward_rs2_data = mem_forward_wb_rs2 ? mem_wb_writeback_data :
+                                  ex_mem_rs2_data;
+    
     wire [31:0] dmem_byte_addr;
-
     assign dmem_byte_addr = ex_mem_alu_result;
 
     // External memory always receives a word-aligned address.
@@ -756,19 +763,19 @@ module hart
     // ------------------------------------------------
 
     assign o_dmem_wdata =
-                         ex_mem_memw ? ex_mem_rs2_data :
+                         ex_mem_memw ? mem_forward_rs2_data :
                          ex_mem_memh ?
                          (
-                          (dmem_byte_addr[1:0] == 2'b00) ? {16'b0, ex_mem_rs2_data[15:0]} :
-                          (dmem_byte_addr[1:0] == 2'b01) ? {8'b0, ex_mem_rs2_data[15:0], 8'b0} :
-                          (dmem_byte_addr[1:0] == 2'b10) ? {ex_mem_rs2_data[15:0], 16'b0} :
+                          (dmem_byte_addr[1:0] == 2'b00) ? {16'b0, mem_forward_rs2_data[15:0]} :
+                          (dmem_byte_addr[1:0] == 2'b01) ? {8'b0, mem_forward_rs2_data[15:0], 8'b0} :
+                          (dmem_byte_addr[1:0] == 2'b10) ? {mem_forward_rs2_data[15:0], 16'b0} :
                           32'b0
                           ) :
                          (
-                          (dmem_byte_addr[1:0] == 2'b00) ? {24'b0, ex_mem_rs2_data[7:0]} :
-                          (dmem_byte_addr[1:0] == 2'b01) ? {16'b0, ex_mem_rs2_data[7:0], 8'b0} :
-                          (dmem_byte_addr[1:0] == 2'b10) ? {8'b0, ex_mem_rs2_data[7:0], 16'b0} :
-                          {ex_mem_rs2_data[7:0], 24'b0}
+                          (dmem_byte_addr[1:0] == 2'b00) ? {24'b0, mem_forward_rs2_data[7:0]} :
+                          (dmem_byte_addr[1:0] == 2'b01) ? {16'b0, mem_forward_rs2_data[7:0], 8'b0} :
+                          (dmem_byte_addr[1:0] == 2'b10) ? {8'b0, mem_forward_rs2_data[7:0], 16'b0} :
+                          {mem_forward_rs2_data[7:0], 24'b0}
                           );
 
 
@@ -872,7 +879,7 @@ module hart
     		mem_wb_rs1            <= ex_mem_rs1;
     		mem_wb_rs2            <= ex_mem_rs2;
     		mem_wb_rs1_data       <= ex_mem_rs1_data;
-   			mem_wb_rs2_data       <= ex_mem_rs2_data;
+   			mem_wb_rs2_data       <= mem_forward_rs2_data;
             mem_wb_rd             <= ex_mem_rd;
             mem_wb_rd_sel         <= ex_mem_rd_sel;
 			mem_wb_dmem_addr      <= o_dmem_addr;
@@ -883,7 +890,7 @@ module hart
     		mem_wb_dmem_wdata     <= o_dmem_wdata;
             mem_wb_legal          <= ex_mem_legal;
             mem_wb_halt           <= ex_mem_halt;
-            mem_wb_trap           <= ex_mem_trap;
+            mem_wb_trap           <= ex_mem_trap || dmem_misaligned;
         end
     end
 
@@ -992,10 +999,7 @@ module hazardctrl
         if (FWD_EN && BYPASS_EN) begin : g_bypass_forwarding
             // we can't forward from a load...
             // UNLESS we're doing load->store where store is storing loaded value
-            // only reason we CAN'T forward is
-            // load->store where store needs to use loaded value as offset
-            // that is, load rd == store rs1
-            // if load rd == store rs2, we can just mem->mem forward
+            // (load rd == store rs2)
             assign stall = i_ex_load & (ex_match_rs1 |
                                         (ex_match_rs2 & i_id_store));
         end else if (FWD_EN) begin : g_forwarding
