@@ -306,6 +306,25 @@ module hart
                      .o_pc_sel(pc_alu_sel)
                      );
 
+	wire [6:0] opcode;
+	wire uses_rs1;
+	wire uses_rs2;
+
+	assign opcode = if_id_inst[6:0];
+
+	assign uses_rs1 =
+    	(opcode == 7'b0110011) || // R-type ALU
+    	(opcode == 7'b0010011) || // I-type ALU
+    	(opcode == 7'b0000011) || // Load
+    	(opcode == 7'b0100011) || // Store
+    	(opcode == 7'b1100011) || // Branch
+    	(opcode == 7'b1100111);   // JALR
+
+	assign uses_rs2 =
+    	(opcode == 7'b0110011) || // R-type ALU
+    	(opcode == 7'b0100011) || // Store
+    	(opcode == 7'b1100011);   // Branch
+
 
     // ================================================================
     // STAGE 2.5: REGISTERS
