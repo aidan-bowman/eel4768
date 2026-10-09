@@ -107,7 +107,7 @@ module hart_tb #(
     // magic incantation to load hex program
     // Phase 4 Update, replace "hart_program.hex" with " hazard_program.hex" or "no_hazard_program.hex"
     initial begin
-        $readmemh("no_hazard_program.hex", imem);
+        $readmemh("hazard_program.hex", imem);
     end
 
     // Phase 4 Update (use 0x00400000 offset)
@@ -242,7 +242,7 @@ module hart_tb #(
     // Phase 4 Update: Using !i_rst && o_retire_valid 
     always @(posedge i_clk) begin
         if (!i_rst && o_retire_valid) begin
-            $fwrite(trace_file, "%08x %08x %d %d %02x %08x %02x %08x %02x %08x %d %08x %x %08x %08x %08x\n",
+            $fwrite(trace_file, "%08x %08x %d %d %02x %08x %02x %08x %02x %08x %d %08x %x %08x %08x\n",
                 o_retire_pc,
                 o_retire_inst,
                 o_retire_trap,
@@ -257,8 +257,7 @@ module hart_tb #(
                 o_retire_dmem_addr,
                 o_retire_dmem_mask,
                 o_retire_dmem_wdata,
-                o_retire_next_pc,
-                o_retire_dmem_rdata);
+                o_retire_next_pc);
 
             if (o_retire_halt) begin
                 $fclose(trace_file);

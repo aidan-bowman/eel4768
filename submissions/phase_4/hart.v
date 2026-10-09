@@ -306,26 +306,6 @@ module hart
                      .o_pc_sel(pc_alu_sel)
                      );
 
-	wire [6:0] opcode;
-	wire uses_rs1;
-	wire uses_rs2;
-
-	assign opcode = if_id_inst[6:0];
-
-	assign uses_rs1 =
-    	(opcode == 7'b0110011) || // R-type ALU
-    	(opcode == 7'b0010011) || // I-type ALU
-    	(opcode == 7'b0000011) || // Load
-    	(opcode == 7'b0100011) || // Store
-    	(opcode == 7'b1100011) || // Branch
-    	(opcode == 7'b1100111);   // JALR
-
-	assign uses_rs2 =
-    	(opcode == 7'b0110011) || // R-type ALU
-    	(opcode == 7'b0100011) || // Store
-    	(opcode == 7'b1100011);   // Branch
-
-
     // ================================================================
     // STAGE 2.5: REGISTERS
     // ================================================================
@@ -337,7 +317,7 @@ module hart
 
     // A misaligned or illegal instruction must not write a register.
     // Driving x0 to the write address is how Phase 3 disables writes.
-    wire [4:0]  rf_rd_waddr = (mem_wb_legal & !mem_wb_halt & mem_wb_valid & !mem_wb_trap) ? mem_wb_rd : 5'd0;
+    wire [4:0]  rf_rd_waddr = (mem_wb_legal & !mem_wb_halt & !mem_wb_trap) ? mem_wb_rd : 5'd0;
 
 
     rf #(
@@ -667,8 +647,9 @@ module hart
 			ex_mem_nextpc     <= id_ex_nextpc;
 			ex_mem_inst       <= id_ex_inst;
 			ex_mem_rs1_data   <= forward_rs1_data;
-			ex_mem_rs1        <= alu_op1;
-			ex_mem_rs2        <= forward_rs2_data;
+            ex_mem_rs2_data   <= forward_rs2_data;
+			ex_mem_rs1        <= id_ex_rs1;
+			ex_mem_rs2        <= id_ex_rs2;
             ex_mem_imm        <= id_ex_imm;
             ex_mem_rd         <= id_ex_rd;
             ex_mem_memread    <= id_ex_memread;
@@ -693,14 +674,11 @@ module hart
     wire [31:0] mem_forward_rs2_data;
     wire        mem_forward_wb_rs2;
 
-    assign mem_forward_wb_rs2 = FWD EN &&
+    assign mem_forward_wb_rs2 = FWD_EN &&
                                 (mem_wb_rd != 5'd0) &&
                                 mem_wb_legal &&
                                 !mem_wb_halt &&
                                 (mem_wb_rd == ex_mem_rs2);
-
-
-	// Forwarding multiplexers
 
     assign mem_forward_rs2_data = mem_forward_wb_rs2 ? mem_wb_writeback_data :
                                   ex_mem_rs2_data;
@@ -848,7 +826,6 @@ module hart
 	reg [31:0] mem_wb_pc;
 	reg [31:0] mem_wb_next_pc;
 	reg [31:0] mem_wb_inst;
-	reg mem_wb_valid;
 	
 	reg [4:0]  mem_wb_rs1;
 	reg [4:0]  mem_wb_rs2;
@@ -913,6 +890,8 @@ module hart
         end
     end
 
+    assign o_retire_valid = mem_wb_legal;
+      
     assign o_retire_trap = mem_wb_trap;
     assign o_retire_trap = mem_wb_trap;
 	assign o_retire_next_pc = mem_wb_next_pc;
