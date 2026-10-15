@@ -152,14 +152,14 @@ module hart
     hazardctrl (
                 .i_id_rs1(rs1), // fill in our wires in parenthesis
                 .i_id_rs2(rs2),
-                .i_id_store(decoder_dmem_ren),
+                .i_id_store(decoder_dmem_wen),
                 .i_ex_rd(id_ex_rd),
                 .i_ex_rs1(id_ex_rs1),
                 .i_ex_rs2(id_ex_rs2),
-                .i_ex_load(id_ex_memwrite),
+                .i_ex_load(id_ex_memread),
                 .i_ex_btaken(ex_branchtaken),
                 .i_mem_rd(ex_mem_rd),
-                .i_wb_rd(ex_mem_rd),
+                .i_wb_rd(mem_wb_rd),
                 //outputs
                 .o_if_hold(if_hold),
                 .o_id_nop(id_nop)
@@ -178,10 +178,12 @@ module hart
     
     assign pc_plus_4 = pc + 32'd4;
     
-    assign next_pc = if_hold ? pc :
-                     jump_taken ? jump_target :
-                     ex_branchtaken ? ex_branchtarget :
-                     pc_plus_4;
+    
+	assign next_pc = jump_taken     ? jump_target :
+    	             ex_branchtaken ? ex_branchtarget :
+        	         if_hold        ? pc :
+            	                      pc_plus_4;
+
     
     // =============================================================
     // REGISTER IF/ID
@@ -192,22 +194,32 @@ module hart
     reg [31:0] if_id_inst;
 	reg if_id_valid;
 
-    always @(posedge i_clk) begin
-        if (i_rst) begin
-            pc         <= RESET_ADDR;
-            if_id_pc   <= 32'b0;
-            if_id_inst <= 32'b0;
-            if_id_nextpc <= 32'b0;
-			if_id_valid <= 1'b0;
-        end else if (if_hold) begin
-            // don't update anything
-        end else begin
-            if_id_pc   <= pc;
-            if_id_inst <= i_imem_rdata;
-            pc         <= next_pc;
-            if_id_nextpc <= next_pc;
-        end
-    end
+    
+	always @(posedge i_clk) begin
+    	if (i_rst) begin
+        	pc           <= RESET_ADDR;
+	        if_id_pc     <= 32'b0;
+    	    if_id_inst   <= 32'b0;
+        	if_id_nextpc <= 32'b0;
+	        if_id_valid  <= 1'b0;
+    	end else if (jump_taken || ex_branchtaken) begin
+        	// Redirect fetch and discard the wrong-path instruction.
+        	pc           <= next_pc;
+        	if_id_pc     <= 32'b0;
+        	if_id_inst   <= 32'b0;
+        	if_id_nextpc <= 32'b0;
+        	if_id_valid  <= 1'b0;
+    	end else if (if_hold) begin
+        	// Hold the PC and IF/ID register during a data hazard.
+    	end else begin
+        	if_id_pc     <= pc;
+        	if_id_inst   <= i_imem_rdata;
+        	if_id_nextpc <= pc_plus_4;
+        	if_id_valid  <= 1'b1;
+        	pc           <= pc_plus_4;
+    	end
+	end
+
 
 
     // ================================================================
@@ -383,7 +395,7 @@ module hart
     reg        id_ex_trap;
 
     always @(posedge i_clk) begin
-        if (i_rst | id_nop) begin
+		if (i_rst | id_nop) begin
             id_ex_pc              <= 32'b0;
             id_ex_nextpc          <= 32'b0;
 			id_ex_inst            <= 32'b0;
@@ -595,7 +607,6 @@ module hart
 	reg [31:0] ex_mem_pc;
 	reg [31:0] ex_mem_nextpc;
 	reg        ex_mem_valid;
-	reg [31:0] ex_mem_next_pc;
 	reg [31:0] ex_mem_inst;
 	reg [31:0] ex_mem_imm;
 	
@@ -642,9 +653,10 @@ module hart
             ex_mem_trap       <= 1'b0;
         end else begin
             ex_mem_alu_result <= alu_result;
-            ex_mem_rs2_data   <= id_ex_rs2_data;
             ex_mem_pc         <= id_ex_pc;
-			ex_mem_nextpc     <= id_ex_nextpc;
+			ex_mem_nextpc 	  <= ex_branchtaken ? ex_branchtarget :                  
+								 jump_taken     ? jump_target :                                   
+												  id_ex_nextpc;
 			ex_mem_inst       <= id_ex_inst;
 			ex_mem_rs1_data   <= forward_rs1_data;
             ex_mem_rs2_data   <= forward_rs2_data;
@@ -870,7 +882,7 @@ module hart
         end else begin
             mem_wb_writeback_data <= writeback_data;
             mem_wb_pc             <= ex_mem_pc;
-			mem_wb_next_pc        <= ex_mem_next_pc;
+			mem_wb_next_pc 		  <= ex_mem_nextpc;
 			mem_wb_inst           <= ex_mem_inst;
     		mem_wb_rs1            <= ex_mem_rs1;
     		mem_wb_rs2            <= ex_mem_rs2;
