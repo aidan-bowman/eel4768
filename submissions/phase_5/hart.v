@@ -269,7 +269,40 @@ module hart
     wire [31:0] pc_plus_4;
     wire [31:0] next_pc;
 
-    assign o_imem_raddr = pc;
+    
+    wire        icache_ready;
+    wire [31:0] icache_rdata;
+
+    cache #(
+        .EVICT_POLICY(EVICT_POLICY),
+        .NUM_WAYS(NUM_WAYS),
+        .CACHE_SIZE(CACHE_SIZE),
+        .BLOCK_SIZE(BLOCK_SIZE),
+        .PREFETCH_EN(PREFETCH_EN)
+    ) icache (
+        .i_clk(i_clk),
+        .i_rst(i_rst),
+
+        // CPU-side instruction request
+        .i_ren(1'b1),
+        .i_wen(1'b0),
+        .i_addr(pc),
+        .i_mask(4'b1111),
+        .i_wdata(32'b0),
+        .o_ready(icache_ready),
+        .o_rdata(icache_rdata),
+
+        // External memory-side interface
+        .o_mem_rd(o_imem_rd),
+        .o_mem_rd_addr(o_imem_rd_addr),
+        .i_mem_valid(i_imem_valid),
+        .i_mem_rd_data(i_imem_rd_data),
+        .o_mem_wr(),
+        .o_mem_wr_addr(),
+        .o_mem_wr_data(),
+        .o_mem_wr_be()
+    );
+
     
     assign pc_plus_4 = pc + 32'd4;
     
@@ -298,7 +331,7 @@ module hart
             // don't update anything
         end else begin
             if_id_pc   <= pc;
-            if_id_inst <= i_imem_rdata;
+            if_id_inst <= icache_rdata;
             pc         <= next_pc;
             if_id_nextpc <= next_pc;
         end
@@ -780,39 +813,78 @@ module hart
     
     wire [31:0] dmem_byte_addr;
     assign dmem_byte_addr = ex_mem_alu_result;
+    
+    wire        dcache_ready;
+    wire [31:0] dcache_rdata;
+    wire [31:0] dcache_addr;
+    wire [3:0]  dcache_mask;
+    wire        dcache_ren;
+    wire        dcache_wen;
+    wire [31:0] dcache_wdata;
+
+    assign dcache_addr = {dmem_byte_addr[31:2], 2'b00};
+
+    assign dcache_ren =
+                       ex_mem_memread &&
+                       ex_mem_legal &&
+                       !ex_mem_halt &&
+                       !dmem_misaligned;
+
+    assign dcache_wen =
+                       ex_mem_memwrite &&
+                       ex_mem_legal &&
+                       !ex_mem_halt &&
+                       !dmem_misaligned;
+
+    assign dcache_mask =
+                        ex_mem_memw ? 4'b1111 :
+                        ex_mem_memh ? half_mask :
+                        byte_mask;
+
+    assign dcache_wdata =
+                         ex_mem_memw ? mem_forward_rs2_data :
+                         ex_mem_memh ?
+                         (
+                           (dmem_byte_addr[1:0] == 2'b00) ? {16'b0, mem_forward_rs2_data[15:0]} :
+                           (dmem_byte_addr[1:0] == 2'b01) ? {8'b0, mem_forward_rs2_data[15:0], 8'b0} :
+                           (dmem_byte_addr[1:0] == 2'b10) ? {mem_forward_rs2_data[15:0], 16'b0} :
+                           32'b0
+                         ) :
+                         (
+                           (dmem_byte_addr[1:0] == 2'b00) ? {24'b0, mem_forward_rs2_data[7:0]} :
+                           (dmem_byte_addr[1:0] == 2'b01) ? {16'b0, mem_forward_rs2_data[7:0], 8'b0} :
+                           (dmem_byte_addr[1:0] == 2'b10) ? {8'b0, mem_forward_rs2_data[7:0], 16'b0} :
+                           {mem_forward_rs2_data[7:0], 24'b0}
+                         );
 
     cache #(
-            .EVICT_POLICY(EVICT_POLICY),
-            .NUM_WAYS(NUM_WAYS),
-            .CACHE_SIZE(CACHE_SIZE),
-            .BLOCK_SIZE(BLOCK_SIZE),
-            .PREFETCH_EN(PREFETCH_EN)
-            )
-    cache (
-           .i_clk(i_clk),
-           .i_rst(i_rst),
-           // TODO: fill in the rest
-           /* these ports may be changed
-           .i_ren(),
-           .i_wen(),
-           .i_addr(),
-           .i_mask(),
-           .i_wdata(),
-           .o_ready(),
-           .o_rdata(),
-            */
-           .o_mem_rd(),
-           .o_mem_rd_addr(),
-           .i_mem_valid(),
-           .i_mem_rd_data(),
-           .o_mem_wr(),
-           .o_mem_wr_addr(),
-           .o_mem_wr_data(),
-           .o_mem_wr_be()
-           );
+        .EVICT_POLICY(EVICT_POLICY),
+        .NUM_WAYS(NUM_WAYS),
+        .CACHE_SIZE(CACHE_SIZE),
+        .BLOCK_SIZE(BLOCK_SIZE),
+        .PREFETCH_EN(PREFETCH_EN)
+    ) dcache (
+        .i_clk(i_clk),
+        .i_rst(i_rst),
 
-    // External memory always receives a word-aligned address.
-    assign o_dmem_addr = {dmem_byte_addr[31:2], 2'b00};
+        .i_ren(dcache_ren),
+        .i_wen(dcache_wen),
+        .i_addr(dcache_addr),
+        .i_mask(dcache_mask),
+        .i_wdata(dcache_wdata),
+        .o_ready(dcache_ready),
+        .o_rdata(dcache_rdata),
+
+        .o_mem_rd(o_dmem_rd),
+        .o_mem_rd_addr(o_dmem_rd_addr),
+        .i_mem_valid(i_dmem_valid),
+        .i_mem_rd_data(i_dmem_rd_data),
+        .o_mem_wr(o_dmem_wr),
+        .o_mem_wr_addr(o_dmem_wr_addr),
+        .o_mem_wr_data(o_dmem_wr_data),
+        .o_mem_wr_be(o_dmem_wr_be)
+    );
+
 
 
     // ------------------------------------------------
@@ -839,22 +911,6 @@ module hart
                               (dmem_byte_addr[1] | dmem_byte_addr[0]))
                              );
 
-
-    // Illegal instructions and misaligned accesses have no memory side
-    // effects.
-    assign o_dmem_ren =
-                       ex_mem_memread &&
-                       ex_mem_legal &&
-                       !ex_mem_halt &&
-                       !dmem_misaligned;
-
-    assign o_dmem_wen =
-                       ex_mem_memwrite &&
-                       ex_mem_legal &&
-                       !ex_mem_halt &&
-                       !dmem_misaligned;
-
-
     // ------------------------------------------------
     // Memory mask
     // ------------------------------------------------
@@ -874,33 +930,10 @@ module hart
                       (dmem_byte_addr[1:0] == 2'b10) ? 4'b1100 :
                       4'b0000;
 
-    assign o_dmem_mask =
-                        ex_mem_memw ? 4'b1111 :
-                        ex_mem_memh ? half_mask :
-                        byte_mask;
-
-
     // ------------------------------------------------
     // Store data
     // ------------------------------------------------
-
-    assign o_dmem_wdata =
-                         ex_mem_memw ? mem_forward_rs2_data :
-                         ex_mem_memh ?
-                         (
-                          (dmem_byte_addr[1:0] == 2'b00) ? {16'b0, mem_forward_rs2_data[15:0]} :
-                          (dmem_byte_addr[1:0] == 2'b01) ? {8'b0, mem_forward_rs2_data[15:0], 8'b0} :
-                          (dmem_byte_addr[1:0] == 2'b10) ? {mem_forward_rs2_data[15:0], 16'b0} :
-                          32'b0
-                          ) :
-                         (
-                          (dmem_byte_addr[1:0] == 2'b00) ? {24'b0, mem_forward_rs2_data[7:0]} :
-                          (dmem_byte_addr[1:0] == 2'b01) ? {16'b0, mem_forward_rs2_data[7:0], 8'b0} :
-                          (dmem_byte_addr[1:0] == 2'b10) ? {8'b0, mem_forward_rs2_data[7:0], 16'b0} :
-                          {mem_forward_rs2_data[7:0], 24'b0}
-                          );
-
-
+	
     // ------------------------------------------------
     // Load data
     // ------------------------------------------------
@@ -909,22 +942,22 @@ module hart
     wire [15:0] load_half;
 
     assign load_byte =
-                      (dmem_byte_addr[1:0] == 2'b00) ? i_dmem_rdata[7:0] :
-                      (dmem_byte_addr[1:0] == 2'b01) ? i_dmem_rdata[15:8] :
-                      (dmem_byte_addr[1:0] == 2'b10) ? i_dmem_rdata[23:16] :
-                      i_dmem_rdata[31:24];
+                      (dmem_byte_addr[1:0] == 2'b00) ? dcache_rdata[7:0] :
+                      (dmem_byte_addr[1:0] == 2'b01) ? dcache_rdata[15:8] :
+                      (dmem_byte_addr[1:0] == 2'b10) ? dcache_rdata[23:16] :
+                      dcache_rdata[31:24];
 
     assign load_half =
-                      (dmem_byte_addr[1:0] == 2'b00) ? i_dmem_rdata[15:0] :
-                      (dmem_byte_addr[1:0] == 2'b01) ? i_dmem_rdata[23:8] :
-                      (dmem_byte_addr[1:0] == 2'b10) ? i_dmem_rdata[31:16] :
+                      (dmem_byte_addr[1:0] == 2'b00) ? dcache_rdata[15:0] :
+                      (dmem_byte_addr[1:0] == 2'b01) ? dcache_rdata[23:8] :
+                      (dmem_byte_addr[1:0] == 2'b10) ? dcache_rdata[31:16] :
                       16'b0;
 
 
     assign writeback_data =
                            ex_mem_rd_sel[3] ?
                            (
-                            ex_mem_memw ? i_dmem_rdata :
+                            ex_mem_memw ? dcache_rdata :
                             ex_mem_memh ?
                             (
                              ex_mem_memu ?
@@ -1003,12 +1036,12 @@ module hart
    			mem_wb_rs2_data       <= mem_forward_rs2_data;
             mem_wb_rd             <= ex_mem_rd;
             mem_wb_rd_sel         <= ex_mem_rd_sel;
-			mem_wb_dmem_addr      <= o_dmem_addr;
-    		mem_wb_dmem_mask      <= o_dmem_mask;
-    		mem_wb_dmem_ren       <= o_dmem_ren;
-    		mem_wb_dmem_wen       <= o_dmem_wen;
-    		mem_wb_dmem_rdata     <= i_dmem_rdata;
-    		mem_wb_dmem_wdata     <= o_dmem_wdata;
+			mem_wb_dmem_addr      <= dcache_addr;
+			mem_wb_dmem_mask      <= dcache_mask;
+			mem_wb_dmem_ren       <= dcache_ren;
+			mem_wb_dmem_wen       <= dcache_wen;
+			mem_wb_dmem_rdata     <= dcache_rdata;
+			mem_wb_dmem_wdata     <= dcache_wdata;
             mem_wb_legal          <= ex_mem_legal;
             mem_wb_halt           <= ex_mem_halt;
             mem_wb_trap           <= ex_mem_trap || dmem_misaligned;
