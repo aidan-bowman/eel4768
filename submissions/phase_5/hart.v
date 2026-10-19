@@ -7,7 +7,7 @@ module hart
     // When set, pipeline forwarding optimizations are enabled.
     parameter FWD_EN = 1,
     // When set, register file bypassing is enabled.              
-    parameter BYPASS_EN = 1
+    parameter BYPASS_EN = 1,
     // Cache configuration. Pass these down unchanged to the instruction
     // cache and the data cache (see cache.v). The testbench sets all five,
     // so these defaults are never used for grading.
@@ -1017,7 +1017,6 @@ module hart
 
     assign o_retire_valid = mem_wb_legal;
       
-    assign o_retire_trap = mem_wb_trap;
     assign o_retire_trap = mem_wb_trap;
 	assign o_retire_next_pc = mem_wb_next_pc;
 	
