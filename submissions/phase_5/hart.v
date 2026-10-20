@@ -270,7 +270,7 @@ module hart
     wire [31:0] next_pc;
 
     
-    wire        icache_ready;
+    wire        icache_stall;
     wire [31:0] icache_rdata;
 	wire        cache_hold;
 
@@ -290,7 +290,7 @@ module hart
         .i_addr(pc),
         .i_mask(4'b1111),
         .i_wdata(32'b0),
-        .o_ready(icache_ready),
+        .o_stall(icache_stall),
         .o_rdata(icache_rdata),
 
         // External memory-side interface
@@ -855,7 +855,7 @@ module hart
     wire [31:0] dmem_byte_addr;
     assign dmem_byte_addr = ex_mem_alu_result;
     
-    wire        dcache_ready;
+    wire        dcache_stall;
     wire [31:0] dcache_rdata;
     wire [31:0] dcache_addr;
     wire [3:0]  dcache_mask;
@@ -877,8 +877,8 @@ module hart
                         !ex_mem_halt &&
                         !dmem_misaligned;
 
-	assign cache_hold = !icache_ready ||
-                    	((dcache_ren || dcache_wen) && !dcache_ready);
+	assign cache_hold = icache_stall ||
+                    	((dcache_ren || dcache_wen) && !dcache_stall);
 
     assign dcache_mask =
                         ex_mem_memw ? 4'b1111 :
@@ -916,7 +916,7 @@ module hart
         .i_addr(dcache_addr),
         .i_mask(dcache_mask),
         .i_wdata(dcache_wdata),
-        .o_ready(dcache_ready),
+        .o_stall(dcache_stall),
         .o_rdata(dcache_rdata),
 
         .o_mem_rd(o_dmem_rd),

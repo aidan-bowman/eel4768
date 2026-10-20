@@ -1,4 +1,39 @@
-3`default_nettype none
+`default_nettype none
+
+`define CLOG2(x) \
+   (x <= 2) ? 1 : \
+   (x <= 4) ? 2 : \
+   (x <= 8) ? 3 : \
+   (x <= 16) ? 4 : \
+   (x <= 32) ? 5 : \
+   (x <= 64) ? 6 : \
+   (x <= 128) ? 7 : \
+   (x <= 256) ? 8 : \
+   (x <= 512) ? 9 : \
+   (x <= 1024) ? 10 : \
+   (x <= 2048) ? 11 : \
+   (x <= 4096) ? 12 : \
+   (x <= 8192) ? 13 : \
+   (x <= 16384) ? 14 : \
+   (x <= 32768) ? 15 : \
+   (x <= 65536) ? 16 : \
+   (x <= 131072) ? 17 : \
+   (x <= 262144) ? 18 : \
+   (x <= 524288) ? 19 : \
+   (x <= 1048576) ? 20 : \
+   (x <= 2097152) ? 21 : \
+   (x <= 4194304) ? 22 : \
+   (x <= 8388608) ? 23 : \
+   (x <= 16777216) ? 24 : \
+   (x <= 33554432) ? 25 : \
+   (x <= 67108864) ? 26 : \
+   (x <= 134217728) ? 27 : \
+   (x <= 268435456) ? 28 : \
+   (x <= 536870912) ? 29 : \
+   (x <= 1073741824) ? 30 : \
+   (x <= 2147483648) ? 31 : \
+   (x <= 4294967296) ? 32 : \
+   -1
 
 // A set associative cache. `hart` instantiates two of them, one as the
 // instruction cache and one as the data cache, and passes the same five
@@ -8,14 +43,19 @@ module cache
   #(
     // Replacement policy: 0 = LRU, 1 = PLRU.
     parameter EVICT_POLICY = 0,
-    // Lines per set: 1 = direct mapped, the number of lines = fully associative.
+    // Lines per set: 1    = direct mapped, the number of lines = fully associative.
     parameter NUM_WAYS = 1,
     // Data capacity in KB. Tags, valid bits and dirty bits are not counted.
     parameter CACHE_SIZE = 16,
     // Bytes per line.
     parameter BLOCK_SIZE = 128,
     // Next-line prefetch on a load miss: 1 = on, 0 = off.
-    parameter PREFETCH_EN = 0
+    parameter PREFETCH_EN = 0,
+    // these aren't part of the skeleton given to us
+    // for address splitting.
+    parameter OFFSET_WIDTH = `CLOG2(BLOCK_SIZE),
+    parameter SETIND_WIDTH = `CLOG2((CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS)),
+    parameter TAG_WIDTH = 32 - OFFSET_WIDTH - SETIND_WIDTH
     ) (
        // Global clock.
        input wire                     i_clk,
@@ -24,13 +64,12 @@ module cache
        // CPU side: the phase 4 data memory port, plus `o_ready` to stall the
        // pipeline while the cache waits on main memory. How the cache tells the
        // pipeline to stall is up to you, so you can change these ports.
-
        input wire                     i_ren,
        input wire                     i_wen,
        input wire [31:0]              i_addr,
        input wire [ 3:0]              i_mask,
        input wire [31:0]              i_wdata,
-       output wire                    o_ready,
+       output wire                    o_stall,
        output wire [31:0]             o_rdata,
        // Memory side: one whole line (BLOCK_SIZE bytes) per transfer.
        //
@@ -55,59 +94,101 @@ module cache
        // bytes for a write-through.
        output wire [BLOCK_SIZE-1:0]   o_mem_wr_be
        );
-    // TODO: actual logic
-    // we'll use a lot of generates for this
+    
+    wire [OFFSET_WIDTH-1:0] i_addr_offset;
+    wire [SETIND_WIDTH-1:0] i_addr_setind;
+    wire [ TAG_WIDTH-1:0]   i_addr_tag;
+
+    assign i_addr_offset = i_addr[OFFSET_WIDTH-1 : 0];
+    assign i_addr_setind = i_addr[OFFSET_WIDTH + SETIND_WIDTH-1 : OFFSET_WIDTH];
+    assign i_addr_tag = i_addr[31 : SETIND_WIDTH+OFFSET_WIDTH];
+    
+    // TODO: connect cache_controller
+    // TODO: connect data_array
+    
 endmodule // cache
 
-module set
+// TODO: make sure parameters are passed down
+module cache_controller
   #(
-    // Replacement policy: 0 = LRU, 1 = PLRU.
-    parameter EVICT_POLICY = 0,
-    // Lines per set: 1 = direct mapped, the number of lines = fully associative.
-    parameter NUM_WAYS = 1,
-    // Data capacity in KB. Tags, valid bits and dirty bits are not counted.
-    parameter CACHE_SIZE = 16,
-    // Bytes per line.
-    parameter BLOCK_SIZE = 128,
-    // Next-line prefetch on a load miss: 1 = on, 0 = off.
-    parameter PREFETCH_EN = 0
     ) (
-       input wire i_clk,
-       input wire i_rst,
-       // to find the right block
-       // TODO: skeleton
+       // Global clock.
+       input wire                    i_clk,
+       // Synchronous active-high reset.
+       input wire                    i_rst,
+       // CPU
+       input wire                    i_ren,
+       input wire                    i_wen,
+       output wire                   o_stall,
+       // cache
+       input wire [SETIND_WIDTH-1:0] i_addr_setind,
+       input wire [ TAG_WIDTH-1:0]   i_addr_tag,
+       // data array
+       output wire                   o_refill,
+       output wire                   o_update,
+       // main memory
+       output wire                   o_mem_rd,
+       input wire                    i_mem_valid,
+       output wire                   o_mem_wr,
+       output wire [31:0]            o_mem_wr_addr,
+       output wire [BLOCK_SIZE-1:0]  o_mem_wr_be
        );
-    // TODO: actual logic
-endmodule // set
 
+    // TODO: finish
+    
+    reg [TAG_WIDTH-1:0] tag[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
+    reg                 dirty[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
+    reg                 valid[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
 
-module block
+    genvar              i; 
+    generate
+        for (i = 0; i < 32; i = i + 1) begin : gen_registers
+            always @(posedge i_clk) begin
+                if (i_rst) begin
+                    registers[i] <= 32'b0;
+                end
+            end
+        end
+    endgenerate
+    
+endmodule // cache_controller
+
+// TODO: make sure parameters are passed down
+module data_array
   #(
-    // Replacement policy: 0 = LRU, 1 = PLRU.
-    parameter EVICT_POLICY = 0,
-    // Lines per set: 1 = direct mapped, the number of lines = fully associative.
-    parameter NUM_WAYS = 1,
-    // Data capacity in KB. Tags, valid bits and dirty bits are not counted.
-    parameter CACHE_SIZE = 16,
-    // Bytes per line.
-    parameter BLOCK_SIZE = 128,
-    // Next-line prefetch on a load miss: 1 = on, 0 = off.
-    parameter PREFETCH_EN = 0
     ) (
-       input wire                i_clk,
-       input wire                i_rst,
-       // TODO: skeleton
-       // metadata to identify right block
-       input wire                i_tag,
-       input wire [/* fill in*/] i_offset
-       output wire               o_rdata_valid
-       // data
-       input wire [3:0]          i_mask
-       input wire [31:0]         i_wdata,
-       output wire [31:0]        o_rdata        
-       
+       // global signals
+       input wire                    i_clk,
+       input wire                    i_rst,
+       // CPU
+       input wire [3:0]              i_mask,
+       input wire [31:0]             i_wdata,
+       output wire [31:0]            o_rdata,
+       // cache
+       input wire [OFFSET_WIDTH-1:0] i_addr_offset,
+       // cache controller
+       input wire                    i_refill,
+       input wire                    i_update,
+       // main memory
+       input wire [BLOCK_SIZE*8-1:0]   i_mem_rd_data,
+       output wire [BLOCK_SIZE*8-1:0]  o_mem_wr_data
        );
-endmodule // block
 
+    // TODO: finish
+    
+    reg [BLOCK_SIZE-1:0] block[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
+
+    genvar      i; 
+    generate
+        for (i = 0; i < 32; i = i + 1) begin : gen_registers
+            always @(posedge i_clk) begin
+                if (i_rst) begin
+                    registers[i] <= 32'b0;
+                end
+            end
+        end
+    endgenerate
+
+endmodule // data_array
 
 `default_nettype wire
