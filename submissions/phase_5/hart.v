@@ -272,6 +272,7 @@ module hart
     
     wire        icache_ready;
     wire [31:0] icache_rdata;
+	wire        cache_hold;
 
     cache #(
         .EVICT_POLICY(EVICT_POLICY),
@@ -327,7 +328,7 @@ module hart
             if_id_inst <= 32'b0;
             if_id_nextpc <= 32'b0;
 			if_id_valid <= 1'b0;
-        end else if (if_hold) begin
+        end else if (if_hold || cache_hold) begin
             // don't update anything
         end else begin
             if_id_pc   <= pc;
@@ -510,11 +511,12 @@ module hart
     reg        id_ex_halt;
     reg        id_ex_trap;
 
+    
     always @(posedge i_clk) begin
-        if (i_rst | id_nop) begin
+        if (i_rst) begin
             id_ex_pc              <= 32'b0;
             id_ex_nextpc          <= 32'b0;
-			id_ex_inst            <= 32'b0;
+            id_ex_inst            <= 32'b0;
             id_ex_rs1_data        <= 32'b0;
             id_ex_rs2_data        <= 32'b0;
             id_ex_rs1             <= 5'd0;
@@ -531,7 +533,7 @@ module hart
             id_ex_branch_equal    <= 1'b0;
             id_ex_branch_unsigned <= 1'b0;
             id_ex_branch_invert   <= 1'b0;
-            id_ex_jump            <= 1'b0;
+            id_ex_jump             <= 1'b0;
             id_ex_pc_alu_sel      <= 1'b0;
             id_ex_memread         <= 1'b0;
             id_ex_memwrite        <= 1'b0;
@@ -544,10 +546,45 @@ module hart
             id_ex_legal           <= 1'b0;
             id_ex_halt            <= 1'b0;
             id_ex_trap            <= 1'b0;
-        end else begin // if o_id_nop
+        end else if (cache_hold) begin
+            // Hold all ID/EX registers while the cache is waiting.
+        end else if (id_nop) begin
+            id_ex_pc              <= 32'b0;
+            id_ex_nextpc          <= 32'b0;
+            id_ex_inst            <= 32'b0;
+            id_ex_rs1_data        <= 32'b0;
+            id_ex_rs2_data        <= 32'b0;
+            id_ex_rs1             <= 5'd0;
+            id_ex_rs2             <= 5'd0;
+            id_ex_imm             <= 32'b0;
+            id_ex_rd              <= 5'd0;
+            id_ex_alu_opsel       <= 3'b0;
+            id_ex_alu_sub         <= 1'b0;
+            id_ex_alu_unsigned    <= 1'b0;
+            id_ex_alu_arith       <= 1'b0;
+            id_ex_op1_pc_sel      <= 1'b0;
+            id_ex_op2_imm_sel     <= 1'b0;
+            id_ex_branch          <= 1'b0;
+            id_ex_branch_equal    <= 1'b0;
+            id_ex_branch_unsigned <= 1'b0;
+            id_ex_branch_invert   <= 1'b0;
+            id_ex_jump             <= 1'b0;
+            id_ex_pc_alu_sel      <= 1'b0;
+            id_ex_memread         <= 1'b0;
+            id_ex_memwrite        <= 1'b0;
+            id_ex_memalign        <= 2'b0;
+            id_ex_memb            <= 1'b0;
+            id_ex_memh            <= 1'b0;
+            id_ex_memw            <= 1'b0;
+            id_ex_memu            <= 1'b0;
+            id_ex_rd_sel          <= 4'b0;
+            id_ex_legal           <= 1'b0;
+            id_ex_halt            <= 1'b0;
+            id_ex_trap            <= 1'b0;
+        end else begin
             id_ex_pc              <= if_id_pc;
             id_ex_nextpc          <= if_id_nextpc;
-			id_ex_inst            <= if_id_inst;
+            id_ex_inst            <= if_id_inst;
             id_ex_rs1_data        <= rs1_data;
             id_ex_rs2_data        <= rs2_data;
             id_ex_rs1             <= rs1;
@@ -564,7 +601,7 @@ module hart
             id_ex_branch_equal    <= branch_equal;
             id_ex_branch_unsigned <= branch_unsigned;
             id_ex_branch_invert   <= branch_invert;
-            id_ex_jump            <= inst_jump;
+            id_ex_jump             <= inst_jump;
             id_ex_pc_alu_sel      <= pc_alu_sel;
             id_ex_memread         <= decoder_dmem_ren;
             id_ex_memwrite        <= decoder_dmem_wen;
@@ -577,8 +614,9 @@ module hart
             id_ex_legal           <= legal;
             id_ex_halt            <= halt;
             id_ex_trap            <= trap;
-        end // else: !if(i_rst | id_nop)
-    end // always @ (posedge i_clk)
+        end
+    end
+
     
     // ================================================================
 	// STAGE 3: EXECUTE
@@ -822,19 +860,22 @@ module hart
     wire        dcache_wen;
     wire [31:0] dcache_wdata;
 
-    assign dcache_addr = {dmem_byte_addr[31:2], 2'b00};
+    assign dcache_addr= {dmem_byte_addr[31:2], 2'b00};
 
     assign dcache_ren =
-                       ex_mem_memread &&
-                       ex_mem_legal &&
-                       !ex_mem_halt &&
-                       !dmem_misaligned;
+                        ex_mem_memread &&
+                        ex_mem_legal &&
+                        !ex_mem_halt &&
+                        !dmem_misaligned;
 
     assign dcache_wen =
-                       ex_mem_memwrite &&
-                       ex_mem_legal &&
-                       !ex_mem_halt &&
-                       !dmem_misaligned;
+                        ex_mem_memwrite &&
+                        ex_mem_legal &&
+                        !ex_mem_halt &&
+                        !dmem_misaligned;
+
+	assign cache_hold = !icache_ready ||
+                    	((dcache_ren || dcache_wen) && !dcache_ready);
 
     assign dcache_mask =
                         ex_mem_memw ? 4'b1111 :
