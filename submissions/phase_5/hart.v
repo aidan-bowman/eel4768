@@ -446,8 +446,9 @@ module hart
 
     // A misaligned or illegal instruction must not write a register.
     // Driving x0 to the write address is how Phase 3 disables writes.
-    wire [4:0]  rf_rd_waddr = (mem_wb_legal & !mem_wb_halt & !mem_wb_trap) ? mem_wb_rd : 5'd0;
-
+    wire [4:0] rf_rd_waddr =
+    (mem_wb_legal & !mem_wb_halt & !mem_wb_trap && !cache_hold)
+    ? mem_wb_rd : 5'd0;
 
     rf #(
          .BYPASS_EN(BYPASS_EN)
@@ -806,6 +807,8 @@ module hart
             ex_mem_legal      <= 1'b0;
             ex_mem_halt       <= 1'b0;
             ex_mem_trap       <= 1'b0;
+		end else if (cache_hold) begin
+        	// Hold all EX/MEM registers while the cache is waiting.
         end else begin
             ex_mem_alu_result <= alu_result;
             ex_mem_rs2_data   <= id_ex_rs2_data;
@@ -1066,6 +1069,8 @@ module hart
             mem_wb_legal          <= 1'b0;
             mem_wb_halt           <= 1'b0;
             mem_wb_trap           <= 1'b0;
+		end else if (cache_hold) begin
+            // Hold all MEM/WB registers while the cache is waiting.
         end else begin
             mem_wb_writeback_data <= writeback_data;
             mem_wb_pc             <= ex_mem_pc;
@@ -1089,7 +1094,7 @@ module hart
         end
     end
 
-    assign o_retire_valid = mem_wb_legal;
+    assign o_retire_valid = mem_wb_legal && !cache_hold;
       
     assign o_retire_trap = mem_wb_trap;
 	assign o_retire_next_pc = mem_wb_next_pc;
