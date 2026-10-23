@@ -158,32 +158,68 @@ module data_array
   #(
     ) (
        // global signals
-       input wire                    i_clk,
-       input wire                    i_rst,
-       // CPU
-       input wire [3:0]              i_mask,
-       input wire [31:0]             i_wdata,
-       output wire [31:0]            o_rdata,
-       // cache
-       input wire [OFFSET_WIDTH-1:0] i_addr_offset,
-       // cache controller
-       input wire                    i_refill,
-       input wire                    i_update,
-       // main memory
-       input wire [BLOCK_SIZE*8-1:0]   i_mem_rd_data,
-       output wire [BLOCK_SIZE*8-1:0]  o_mem_wr_data
-       );
+      input wire                    i_clk,
+      input wire                    i_rst,
+      // CPU
+      input wire [3:0]              i_mask,
+      input wire [31:0]             i_wdata,
+      output wire [31:0]            o_rdata,
+      // cache
+      input wire [OFFSET_WIDTH-1:0] i_addr_offset,
+      // cache controller
+      input wire                    i_refill,
+      input wire                    i_update,
+      // main memory
+      input wire [BLOCK_SIZE*8-1:0] i_mem_rd_data,
+      output wire [BLOCK_SIZE*8-1:0] o_mem_wr_data,
+      input wire [SETIND_WIDTH-1:0] i_addr_setind,
+      input wire [WAY_WIDTH-1:0]    i_way
+      );
 
-    // TODO: finish
     
-    reg [BLOCK_SIZE-1:0] block[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
+    // Store each cache line as an array of 32-bit words.
+    reg [31:0] block [0:NUM_SETS-1]
+                       [0:NUM_WAYS-1]
+                       [0:(BLOCK_SIZE/4)-1];
 
-    genvar      i; 
+    // Read the selected word from the selected cache line.
+    assign o_rdata =
+        block[i_addr_setind][i_way][i_addr_offset[OFFSET_WIDTH-1:2]];
+
+    genvar word;
     generate
-        for (i = 0; i < 32; i = i + 1) begin : gen_registers
+        for (word = 0; word < BLOCK_SIZE/4; word = word + 1) begin : gen_words
+
+            // Expose the selected cache line for memory writeback.
+            assign o_mem_wr_data[word*32 +: 32] =
+                block[i_addr_setind][i_way][word];
+
             always @(posedge i_clk) begin
-                if (i_rst) begin
-                    registers[i] <= 32'b0;
+                // Refill the entire cache line, one word at a time.
+                if (i_refill) begin
+                    block[i_addr_setind][i_way][word] <=
+                        i_mem_rd_data[word*32 +: 32];
+                end
+
+                // Update the selected word for a CPU store.
+                else if (i_update &&
+                         i_addr_offset[OFFSET_WIDTH-1:2] == word) begin
+
+                    if (i_mask[0])
+                        block[i_addr_setind][i_way][word][7:0]
+                            <= i_wdata[7:0];
+
+                    if (i_mask[1])
+                        block[i_addr_setind][i_way][word][15:8]
+                            <= i_wdata[15:8];
+
+                    if (i_mask[2])
+                        block[i_addr_setind][i_way][word][23:16]
+                            <= i_wdata[23:16];
+
+                    if (i_mask[3])
+                        block[i_addr_setind][i_way][word][31:24]
+                            <= i_wdata[31:24];
                 end
             end
         end
