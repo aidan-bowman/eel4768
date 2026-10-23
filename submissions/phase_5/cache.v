@@ -56,7 +56,8 @@ module cache
     parameter OFFSET_WIDTH = `CLOG2(BLOCK_SIZE),
     parameter SETIND_WIDTH = `CLOG2((CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS)),
     parameter TAG_WIDTH = 32 - OFFSET_WIDTH - SETIND_WIDTH,
-    parameter WAY_WIDTH = `CLOG2(NUM_WAYS)
+    parameter WAY_WIDTH = `CLOG2(NUM_WAYS),
+    parameter NUM_SETS = (CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS)
     ) (
        // Global clock.
        input wire                     i_clk,
@@ -103,12 +104,62 @@ module cache
     assign i_addr_offset = i_addr[OFFSET_WIDTH-1 : 0];
     assign i_addr_setind = i_addr[OFFSET_WIDTH + SETIND_WIDTH-1 : OFFSET_WIDTH];
     assign i_addr_tag = i_addr[31 : SETIND_WIDTH+OFFSET_WIDTH];
-    
-    // TODO: connect cache_controller
-    // TODO: connect data_array
-    
-endmodule // cache
 
+       // Internal connections between the cache modules.
+    wire                  refill;
+    wire                  update;
+    wire [WAY_WIDTH-1:0]  way;
+
+    wire                  mem_rd;
+    wire                  mem_wr;
+    wire [31:0]           mem_wr_addr;
+    wire [BLOCK_SIZE-1:0] mem_wr_be;
+    wire [31:0]           data_rdata;
+    wire [BLOCK_SIZE*8-1:0] data_mem_wr_data;
+        
+    // Connect the cache controller.
+    cache_controller controller (
+        .i_clk(i_clk),
+        .i_rst(i_rst),
+        .i_ren(i_ren),
+        .i_wen(i_wen),
+        .o_stall(o_stall),
+        .i_addr_setind(i_addr_setind),
+        .i_addr_tag(i_addr_tag),
+        .o_way(way),
+        .o_refill(refill),
+        .o_update(update),
+        .o_mem_rd(o_mem_rd),
+        .o_mem_rd_addr(o_mem_rd_addr),
+        .i_mem_valid(i_mem_valid),
+        .o_mem_wr(o_mem_wr),
+        .o_mem_wr_addr(o_mem_wr_addr),
+        .o_mem_wr_be(o_mem_wr_be)
+    );
+
+    // Connect the cache data array.
+    data_array data_storage (
+        .i_clk(i_clk),
+        .i_rst(i_rst),
+        .i_mask(i_mask),
+        .i_wdata(i_wdata),
+        .o_rdata(data_rdata),
+        .i_addr_offset(i_addr_offset),
+        .i_refill(refill),
+        .i_update(update),
+        .i_mem_rd_data(i_mem_rd_data),
+        .o_mem_wr_data(data_mem_wr_data),
+        .i_addr_setind(i_addr_setind),
+        .i_way(way)
+    );
+
+    // Return data from the selected cache line.
+    assign o_rdata = data_rdata;
+
+    // Forward the selected cache line for memory writeback.
+    assign o_mem_wr_data = data_mem_wr_data;
+
+endmodule // cache
 // TODO: make sure parameters are passed down
 module cache_controller
   #(
@@ -121,12 +172,14 @@ module cache_controller
        output wire                   o_stall,
        // cache
        input wire [SETIND_WIDTH-1:0] i_addr_setind,
-       input wire [TAG_WIDTH-1:0]    i_addr_tag,
+       input wire [TAG_WIDTH-1:0]   i_addr_tag,
+       output wire [WAY_WIDTH-1:0]   o_way,
        // data array
        output wire                   o_refill,
        output wire                   o_update,
        // main memory
        output wire                   o_mem_rd,
+       output wire [31:0]            o_mem_rd_addr,
        input wire                    i_mem_valid,
        output wire                   o_mem_wr,
        output wire [31:0]            o_mem_wr_addr,
@@ -139,19 +192,35 @@ module cache_controller
     reg                 dirty[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
     reg                 valid[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
 
-    genvar              i; 
-    generate
-        for (i = 0; i < 32; i = i + 1) begin : gen_registers
-            always @(posedge i_clk) begin
-                if (i_rst) begin
-                    tag[i]   <= 32'b0;
-                    dirty[i] <= 0;
-                    valid[i] <= 0;
-                end else begin
-                end
+    // Controller state.
+    localparam IDLE = 2'd0;
+    localparam LOOKUP = 2'd1;
+    localparam WAIT_MEM = 2'd2;
+
+    reg [1:0] state;
+
+    reg [WAY_WIDTH-1:0] lookup_way;
+    reg hit;
+    reg [WAY_WIDTH-1:0] hit_way;
+
+    integer way_index;
+    integer line_index;
+
+       // Find a matching valid cache line in the requested set.
+    always @(*) begin
+        hit = 1'b0;
+        hit_way = {WAY_WIDTH{1'b0}};
+
+        for (way_index = 0; way_index < NUM_WAYS;
+             way_index = way_index + 1) begin
+            line_index = i_addr_setind * NUM_WAYS + way_index;
+
+            if (valid[line_index] && tag[line_index] == i_addr_tag) begin
+                hit = 1'b1;
+                hit_way = way_index;
             end
         end
-    endgenerate
+    end
     
 endmodule // cache_controller
 
