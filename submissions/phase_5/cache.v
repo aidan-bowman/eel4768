@@ -55,7 +55,8 @@ module cache
     // for address splitting.
     parameter OFFSET_WIDTH = `CLOG2(BLOCK_SIZE),
     parameter SETIND_WIDTH = `CLOG2((CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS)),
-    parameter TAG_WIDTH = 32 - OFFSET_WIDTH - SETIND_WIDTH
+    parameter TAG_WIDTH = 32 - OFFSET_WIDTH - SETIND_WIDTH,
+    parameter WAY_WIDTH = `CLOG2(NUM_WAYS)
     ) (
        // Global clock.
        input wire                     i_clk,
@@ -112,9 +113,7 @@ endmodule // cache
 module cache_controller
   #(
     ) (
-       // Global clock.
        input wire                    i_clk,
-       // Synchronous active-high reset.
        input wire                    i_rst,
        // CPU
        input wire                    i_ren,
@@ -122,7 +121,7 @@ module cache_controller
        output wire                   o_stall,
        // cache
        input wire [SETIND_WIDTH-1:0] i_addr_setind,
-       input wire [ TAG_WIDTH-1:0]   i_addr_tag,
+       input wire [TAG_WIDTH-1:0]    i_addr_tag,
        // data array
        output wire                   o_refill,
        output wire                   o_update,
@@ -145,13 +144,84 @@ module cache_controller
         for (i = 0; i < 32; i = i + 1) begin : gen_registers
             always @(posedge i_clk) begin
                 if (i_rst) begin
-                    registers[i] <= 32'b0;
+                    tag[i]   <= 32'b0;
+                    dirty[i] <= 0;
+                    valid[i] <= 0;
+                end else begin
                 end
             end
         end
     endgenerate
     
 endmodule // cache_controller
+
+// when activated (i.e when the cachecontroller gets this set address),
+// this module searches and finds which specific address has the tag.
+// it ALSO finds which way to evict when replacing
+// and whether that way was dirty and needs to be WB-ed
+module setinfo
+  #(
+    // TODO: fill in
+    ) (
+       input wire                  i_clk,
+       input wire                  i_rst,
+       // CPU
+       input wire                  i_ren,
+       input wire                  i_wen,
+       // cache
+       input wire [TAG_WIDTH-1:0]  i_addr_tag,
+       // if true, we've found the way
+       // if false, we need to refill
+       output wire                 o_found,
+       output wire [WAY_WIDTH-1:0] o_way,
+       // are we evicting AND writing back the old data here?
+       output wire                 o_evicting_wb
+       );
+
+    reg [TAG_WIDTH-1:0] tag[NUM_WAYS-1:0];
+    reg                 valid[NUM_WAYS-1:0];
+    reg                 dirty[NUM_WAYS-1:0];
+
+    reg                 found;
+    reg [WAY_WIDTH-1:0] way;
+
+    // replacement policy
+    generate
+        if (EVICT_POLICY) begin : PLRU
+            // assume power of 2 ways
+            // we're doing this kind of like a heap
+            reg [NUM_WAYS-1:1] ptrs;
+        end else begin : LRU
+            reg [WAY_WIDTH-1:0] age[NUM_WAYS-1:0];
+            // when we use/replace a way, set its age to 0
+            // other ages have to shift to maintain order 0->1->2->3->...
+        end
+    endgenerate
+
+    genvar              i; 
+    generate
+        for (i = 0; i < NUM_WAYS; i = i + 1) begin : gen_setinfo
+            // reading (asynchronous)
+            
+            // writing (synchronous)
+            always @(posedge i_clk) begin
+                if (i_rst) begin
+                    tag[i]   <= 32'b0;
+                    dirty[i] <= 0;
+                    valid[i] <= 0;
+                end else if (/*we need to write here*/) begin
+                    if (valid[i]) begin // evicting
+                        // TODO
+                    end else begin // replacing
+                        valid[i] <= 1;
+                        dirty[i] <= 0;
+                        tag[i]   <= i_addr_tag;
+                    end
+                end
+            end
+        end
+    endgenerate
+endmodule // setinfo
 
 // TODO: make sure parameters are passed down
 module data_array
