@@ -878,7 +878,7 @@ module hart
                         !dmem_misaligned;
 
 	assign cache_hold = icache_stall ||
-                    	((dcache_ren || dcache_wen) && !dcache_stall);
+                    	((dcache_ren || dcache_wen) && dcache_stall);
 
     assign dcache_mask =
                         ex_mem_memw ? 4'b1111 :
