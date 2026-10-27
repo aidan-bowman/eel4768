@@ -240,6 +240,41 @@ module cache_controller
         output wire [BLOCK_SIZE-1:0] o_mem_wr_be
        );
 
+    // Cache metadata.
+    reg [TAG_WIDTH-1:0] tag[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
+    reg                 dirty[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
+    reg                 valid[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
+
+    // Controller state.
+    localparam IDLE       = 3'd0;
+    localparam WRITEBACK  = 3'd1;
+    localparam READ_REQ   = 3'd2;
+    localparam WAIT_MEM   = 3'd3;
+    localparam STORE_MISS = 3'd4;
+    localparam STORE_DONE = 3'd5;
+
+    reg [2:0] state;
+
+    reg [WAY_WIDTH-1:0] hit_way;
+    reg [WAY_WIDTH-1:0] victim_way;
+    reg [WAY_WIDTH-1:0] miss_way;
+
+    reg [TAG_WIDTH-1:0] victim_tag;
+    reg                 victim_dirty;
+    reg                 victim_invalid;
+
+    reg [31:0] miss_addr;
+    reg [BLOCK_SIZE-1:0] store_miss_be;
+
+    wire hit;
+
+    integer byte_index;
+    integer meta_index;
+    integer way_index;
+    integer line_index;
+    integer select_index;
+    integer select_line_index;
+
     reg [31:0] miss_addr;
     reg [BLOCK_SIZE-1:0] store_miss_be;
 
@@ -320,7 +355,6 @@ module cache_controller
             case (state)
               IDLE: begin
                   if ((i_ren || i_wen) && !hit) begin
-                      miss_addr <= i_addr_tag;
                       miss_addr <= {
                                     i_addr_tag,
                                     i_addr_setind,
@@ -393,36 +427,6 @@ module cache_controller
         end
     end
     
-    reg [TAG_WIDTH-1:0] tag[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
-    reg                 dirty[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
-    reg                 valid[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
-
-    // Controller state.
-    localparam          IDLE       = 3'd0;
-    localparam          WRITEBACK  = 3'd1;
-    localparam          READ_REQ   = 3'd2;
-    localparam          WAIT_MEM   = 3'd3;
-    localparam          STORE_MISS = 3'd4;
-    localparam          STORE_DONE = 3'd5;
-
-    reg [2:0]           state;
-
-    reg [WAY_WIDTH-1:0] hit_way;
-    reg [WAY_WIDTH-1:0] victim_way;
-    reg [WAY_WIDTH-1:0] miss_way;
-
-    reg [SETIND_WIDTH-1:0] miss_setind;
-    reg [TAG_WIDTH-1:0]    miss_tag;
-    reg [TAG_WIDTH-1:0]    victim_tag;
-    reg                    victim_dirty;
-
-    reg                    victim_invalid;
-
-    integer                way_index;
-    integer                line_index;
-    integer                select_index;
-    integer                select_line_index;
-
     // Find a matching valid cache line in the requested set.
     always @(*) begin
         hit = 1'b0;
