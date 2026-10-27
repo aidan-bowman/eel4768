@@ -188,7 +188,7 @@ module cache
 
 endmodule // cache
 // TODO: make sure parameters are passed down
-module cache_controller
+module cache_controller (
        input wire                    i_clk,
        input wire                    i_rst,
        // CPU
@@ -442,7 +442,7 @@ endmodule // cache_controller
 // this module searches and finds which specific address has the tag.
 // it ALSO finds which way to evict when replacing
 // and whether that way was dirty and needs to be WB-ed
-module setinfo
+module setinfo (
        input wire                  i_clk,
        input wire                  i_rst,
        // CPU
@@ -530,7 +530,7 @@ module setinfo
 endmodule // setinfo
 
 // TODO: make sure parameters are passed down
-module data_array
+module data_array (
        // global signals
       input wire                    i_clk,
       input wire                    i_rst,
