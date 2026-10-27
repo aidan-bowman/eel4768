@@ -189,8 +189,6 @@ module cache
 endmodule // cache
 // TODO: make sure parameters are passed down
 module cache_controller
-  #(
-    ) (
        input wire                    i_clk,
        input wire                    i_rst,
        // CPU
