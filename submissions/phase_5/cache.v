@@ -251,9 +251,35 @@ module setinfo
     reg                 valid[NUM_WAYS-1:0];
     reg                 dirty[NUM_WAYS-1:0];
 
-    reg                 found;
-    reg [WAY_WIDTH-1:0] way;
+    // Check whether the requested tag is present in a valid way.
+    wire [NUM_WAYS-1:0] hit_vec;
+    wire [WAY_WIDTH-1:0] hit_way_terms [0:NUM_WAYS-1];
+    wire [WAY_WIDTH-1:0] hit_way_or [0:NUM_WAYS];
 
+    assign hit_way_or[0] = {WAY_WIDTH{1'b0}};
+
+    genvar hit_index;
+    generate
+        for (hit_index = 0; hit_index < NUM_WAYS;
+             hit_index = hit_index + 1) begin : gen_hit_detection
+
+            assign hit_vec[hit_index] =
+                valid[hit_index] &&
+                (tag[hit_index] == i_addr_tag);
+
+            assign hit_way_terms[hit_index] =
+                hit_vec[hit_index] ?
+                hit_index : {WAY_WIDTH{1'b0}};
+
+            assign hit_way_or[hit_index+1] =
+                hit_way_or[hit_index] |
+                hit_way_terms[hit_index];
+        end
+    endgenerate
+
+    assign o_found = |hit_vec;
+    assign o_way = hit_way_or[NUM_WAYS];
+   
     // replacement policy
     generate
         if (EVICT_POLICY) begin : PLRU
