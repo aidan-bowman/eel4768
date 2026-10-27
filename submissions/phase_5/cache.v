@@ -71,7 +71,7 @@ module cache
         input wire [31:0]              i_addr,
         input wire [ 3:0]              i_mask,
         input wire [31:0]              i_wdata,
-        output wire                    o_ready,
+        output wire                    o_stall,
         output wire [31:0]             o_rdata,
        // Memory side: one whole line (BLOCK_SIZE bytes) per transfer.
        //
@@ -109,7 +109,6 @@ module cache
     wire                  refill;
     wire                  update;
     wire [WAY_WIDTH-1:0]  way;
-    wire                  controller_stall;
     wire                  store_miss_write;
 
     wire                  mem_rd;
@@ -122,22 +121,19 @@ module cache
     // Connect the cache controller.
     cache_controller
       #(
-         .EVICT_POLICY(EVICT_POLICY),
          .NUM_WAYS(NUM_WAYS),
          .CACHE_SIZE(CACHE_SIZE),
          .BLOCK_SIZE(BLOCK_SIZE),
-         .PREFETCH_EN(PREFETCH_EN),
          .OFFSET_WIDTH(OFFSET_WIDTH),
          .SETIND_WIDTH(SETIND_WIDTH),
          .TAG_WIDTH(TAG_WIDTH),
-         .WAY_WIDTH(WAY_WIDTH),
-         .NUM_SETS(NUM_SETS)
+         .WAY_WIDTH(WAY_WIDTH)
         ) controller (
                       .i_clk(i_clk),
                       .i_rst(i_rst),
                       .i_ren(i_ren),
                       .i_wen(i_wen),
-                      .o_stall(controller_stall),
+                      .o_stall(o_stall),
                       .o_store_miss(store_miss_write),
                       .i_addr_setind(i_addr_setind),
                       .i_addr_tag(i_addr_tag),
@@ -205,7 +201,6 @@ module cache
 
     assign o_mem_wr_data =
                           store_miss_write ? store_miss_data : data_mem_wr_data;
-    assign o_ready = !controller_stall;
 
 endmodule // cache
 
