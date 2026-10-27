@@ -443,9 +443,6 @@ endmodule // cache_controller
 // it ALSO finds which way to evict when replacing
 // and whether that way was dirty and needs to be WB-ed
 module setinfo
-  #(
-    // TODO: fill in
-    ) (
        input wire                  i_clk,
        input wire                  i_rst,
        // CPU
@@ -534,8 +531,6 @@ endmodule // setinfo
 
 // TODO: make sure parameters are passed down
 module data_array
-  #(
-    ) (
        // global signals
       input wire                    i_clk,
       input wire                    i_rst,
