@@ -1,3 +1,4 @@
-iverilog -g2005 -Wall hart_tb.v -o ../../tests/phase_4/sim ../../submissions/phase_4/*
-cd ../../tests/phase_4/
+iverilog -g2005 -Wall hart_tb.v -o ../../tests/phase_5/sim ../../submissions/phase_5/*
+iverilog -g2005 -Wall cache_tb.v -o ../../tests/phase_5/sim ../../submissions/phase_5/*
+cd ../../tests/phase_5/
 vvp sim
