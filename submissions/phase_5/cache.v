@@ -109,7 +109,8 @@ module cache
     wire                  refill;
     wire                  update;
     wire [WAY_WIDTH-1:0]  way;
-    wire                  controller_stall
+    wire                  controller_stall;
+    wire                  store_miss_write;
 
     wire                  mem_rd;
     wire                  mem_wr;
@@ -124,9 +125,13 @@ module cache
         .i_rst(i_rst),
         .i_ren(i_ren),
         .i_wen(i_wen),
-       .o_stall(controller_stall),
+        .o_stall(controller_stall),
+        .o_store_miss(store_miss_write),
         .i_addr_setind(i_addr_setind),
         .i_addr_tag(i_addr_tag),
+        .i_addr_offset(i_addr_offset),
+        .i_mask(i_mask),
+        .i_wdata(i_wdata),
         .o_way(way),
         .o_refill(refill),
         .o_update(update),
@@ -157,10 +162,29 @@ module cache
     // Return data from the selected cache line.
     assign o_rdata = data_rdata;
 
-    // Forward the selected cache line for memory writeback.
-    assign o_mem_wr_data = data_mem_wr_data;
+   // Forward the selected cache line for memory writeback.
+   reg [BLOCK_SIZE*8-1:0] store_miss_data;
+   integer store_byte_index;
 
-    assign o_ready = !controller_stall;
+   always @(*) begin
+       store_miss_data = {BLOCK_SIZE*8{1'b0}};
+
+       for (store_byte_index = 0;
+            store_byte_index < 4;
+            store_byte_index = store_byte_index + 1) begin
+
+           if (i_mask[store_byte_index] &&
+               (i_addr_offset + store_byte_index) < BLOCK_SIZE) begin
+
+               store_miss_data[(i_addr_offset + store_byte_index)*8 +: 8] =
+                   i_wdata[store_byte_index*8 +: 8];
+           end
+       end
+   end
+
+   assign o_mem_wr_data =
+       store_miss_write ? store_miss_data : data_mem_wr_data;
+       assign o_ready = !controller_stall;
 
 endmodule // cache
 // TODO: make sure parameters are passed down
@@ -173,9 +197,13 @@ module cache_controller
        input wire                    i_ren,
        input wire                    i_wen,
        output wire                   o_stall,
+       output wire                   o_store_miss,
        // cache
        input wire [SETIND_WIDTH-1:0] i_addr_setind,
        input wire [TAG_WIDTH-1:0]   i_addr_tag,
+       input wire [OFFSET_WIDTH-1:0] i_addr_offset,
+       input wire [3:0]              i_mask,
+       input wire [31:0]             i_wdata,
        output wire [WAY_WIDTH-1:0]   o_way,
        // data array
        output wire                   o_refill,
@@ -189,7 +217,158 @@ module cache_controller
        output wire [BLOCK_SIZE-1:0]  o_mem_wr_be
        );
 
-    // TODO: finish
+    reg [31:0] miss_addr;
+    reg [BLOCK_SIZE-1:0] store_miss_be;
+
+    integer byte_index;
+    integer meta_index;
+
+    // Keep the CPU stalled until a read miss has been refilled.
+    // A store miss completes after its write-through cycle.
+    assign o_stall =
+        (state != IDLE && state != STORE_DONE) ||
+        (state == IDLE && (i_ren || i_wen) && !hit);
+
+    assign o_store_miss = (state == STORE_MISS);
+
+    assign o_mem_rd = (state == READ_REQ);
+
+    assign o_mem_rd_addr = {
+        miss_addr[31:OFFSET_WIDTH],
+        {OFFSET_WIDTH{1'b0}}
+    };
+
+    assign o_mem_wr = (state == WRITEBACK) ||
+                      (state == STORE_MISS);
+
+    assign o_mem_wr_addr =
+        (state == WRITEBACK)
+        ? {victim_tag, miss_addr[OFFSET_WIDTH+SETIND_WIDTH-1:OFFSET_WIDTH],
+           {OFFSET_WIDTH{1'b0}}}
+        : {miss_addr[31:OFFSET_WIDTH], {OFFSET_WIDTH{1'b0}}};
+
+    assign o_mem_wr_be =
+        (state == WRITEBACK) ? {BLOCK_SIZE{1'b1}} :
+        (state == STORE_MISS) ? store_miss_be :
+        {BLOCK_SIZE{1'b0}};
+
+    assign o_refill = (state == WAIT_MEM) && i_mem_valid;
+
+    assign o_update = (state == IDLE) && i_wen && hit;
+
+    assign o_way =
+        (state == IDLE) ? (hit ? hit_way : victim_way) : miss_way;
+
+    // Generate byte enables for a store miss.
+    always @(*) begin
+        store_miss_be = {BLOCK_SIZE{1'b0}};
+
+        for (byte_index = 0; byte_index < 4;
+             byte_index = byte_index + 1) begin
+            if (i_mask[byte_index] &&
+                (i_addr_offset + byte_index) < BLOCK_SIZE) begin
+                store_miss_be[i_addr_offset + byte_index] = 1'b1;
+            end
+        end
+    end
+
+    // Controller state and cache metadata.
+    always @(posedge i_clk) begin
+        if (i_rst) begin
+            state <= IDLE;
+            miss_addr <= 32'b0;
+            miss_way <= {WAY_WIDTH{1'b0}};
+            victim_tag <= {TAG_WIDTH{1'b0}};
+            victim_dirty <= 1'b0;
+
+            for (meta_index = 0;
+                 meta_index < CACHE_SIZE*1024/BLOCK_SIZE;
+                 meta_index = meta_index + 1) begin
+                tag[meta_index] <= {TAG_WIDTH{1'b0}};
+                valid[meta_index] <= 1'b0;
+                dirty[meta_index] <= 1'b0;
+            end
+        end else begin
+            // A store hit updates the cache line and marks it dirty.
+            if (state == IDLE && i_wen && hit) begin
+                dirty[i_addr_setind * NUM_WAYS + hit_way] <= 1'b1;
+            end
+
+            case (state)
+                IDLE: begin
+                    if ((i_ren || i_wen) && !hit) begin
+                        miss_addr <= i_addr_tag;
+                        miss_addr <= {
+                            i_addr_tag,
+                            i_addr_setind,
+                            i_addr_offset
+                        };
+
+                        if (i_wen) begin
+                            // Store miss: write through, no allocation.
+                            state <= STORE_MISS;
+                        end else begin
+                            // Read miss: select a victim and refill.
+                            miss_way <= victim_way;
+
+                            meta_index =
+                                i_addr_setind * NUM_WAYS + victim_way;
+
+                            victim_tag <= tag[meta_index];
+                            victim_dirty <= valid[meta_index] &&
+                                            dirty[meta_index];
+
+                            if (valid[meta_index] &&
+                                dirty[meta_index]) begin
+                                state <= WRITEBACK;
+                            end else begin
+                                state <= READ_REQ;
+                            end
+                        end
+                    end
+                end
+
+                WRITEBACK: begin
+                    // Memory accepts the write on this clock edge.
+                    state <= READ_REQ;
+                end
+
+                READ_REQ: begin
+                    // Issue exactly one read request.
+                    state <= WAIT_MEM;
+                end
+
+                WAIT_MEM: begin
+                    if (i_mem_valid) begin
+                        meta_index =
+                            miss_addr[OFFSET_WIDTH + SETIND_WIDTH - 1:
+                                      OFFSET_WIDTH] * NUM_WAYS + miss_way;
+
+                        tag[meta_index] <=
+                            miss_addr[31:OFFSET_WIDTH + SETIND_WIDTH];
+                        valid[meta_index] <= 1'b1;
+                        dirty[meta_index] <= 1'b0;
+
+                        state <= IDLE;
+                    end
+                end
+
+                STORE_MISS: begin
+                    // Memory accepts the write on this clock edge.
+                    state <= STORE_DONE;
+                end
+
+                STORE_DONE: begin
+                    // Release the stalled CPU without allocating the line.
+                    state <= IDLE;
+                end
+
+                default: begin
+                    state <= IDLE;
+                end
+            endcase
+        end
+    end
     
     reg [TAG_WIDTH-1:0] tag[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
     reg                 dirty[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
@@ -201,11 +380,13 @@ module cache_controller
     localparam READ_REQ   = 3'd2;
     localparam WAIT_MEM   = 3'd3;
     localparam STORE_MISS = 3'd4;
+    localparam STORE_DONE = 3'd5
 
     reg [2:0] state;
 
     reg [WAY_WIDTH-1:0] hit_way;
     reg [WAY_WIDTH-1:0] victim_way;
+    reg [WAY_WIDTH-1:0] miss_way;
 
     reg [SETIND_WIDTH-1:0] miss_setind;
     reg [TAG_WIDTH-1:0] miss_tag;
