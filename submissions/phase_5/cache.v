@@ -263,9 +263,6 @@ module cache_controller
     reg                 victim_dirty;
     reg                 victim_invalid;
 
-    reg [31:0] miss_addr;
-    reg [BLOCK_SIZE-1:0] store_miss_be;
-
     wire hit;
 
     integer byte_index;
@@ -277,9 +274,6 @@ module cache_controller
 
     reg [31:0] miss_addr;
     reg [BLOCK_SIZE-1:0] store_miss_be;
-
-    integer              byte_index;
-    integer              meta_index;
 
     // Keep the CPU stalled until a read miss has been refilled.
     // A store miss completes after its write-through cycle.
