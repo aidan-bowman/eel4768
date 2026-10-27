@@ -71,7 +71,7 @@ module cache
        input wire [31:0]              i_addr,
        input wire [ 3:0]              i_mask,
        input wire [31:0]              i_wdata,
-       output wire                    o_stall,
+       output wire                    o_ready,
        output wire [31:0]             o_rdata,
        // Memory side: one whole line (BLOCK_SIZE bytes) per transfer.
        //
@@ -109,6 +109,7 @@ module cache
     wire                  refill;
     wire                  update;
     wire [WAY_WIDTH-1:0]  way;
+    wire                  controller_stall
 
     wire                  mem_rd;
     wire                  mem_wr;
@@ -123,7 +124,7 @@ module cache
         .i_rst(i_rst),
         .i_ren(i_ren),
         .i_wen(i_wen),
-        .o_stall(o_stall),
+       .o_stall(controller_stall),
         .i_addr_setind(i_addr_setind),
         .i_addr_tag(i_addr_tag),
         .o_way(way),
@@ -159,6 +160,8 @@ module cache
     // Forward the selected cache line for memory writeback.
     assign o_mem_wr_data = data_mem_wr_data;
 
+    assign o_ready = !controller_stall;
+
 endmodule // cache
 // TODO: make sure parameters are passed down
 module cache_controller
@@ -193,20 +196,33 @@ module cache_controller
     reg                 valid[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
 
     // Controller state.
-    localparam IDLE = 2'd0;
-    localparam LOOKUP = 2'd1;
-    localparam WAIT_MEM = 2'd2;
+    localparam IDLE       = 3'd0;
+    localparam WRITEBACK  = 3'd1;
+    localparam READ_REQ   = 3'd2;
+    localparam WAIT_MEM   = 3'd3;
+    localparam STORE_MISS = 3'd4;
 
-    reg [1:0] state;
+    reg [2:0] state;
 
-    reg [WAY_WIDTH-1:0] lookup_way;
-    reg hit;
     reg [WAY_WIDTH-1:0] hit_way;
+    reg [WAY_WIDTH-1:0] victim_way;
+
+    reg [SETIND_WIDTH-1:0] miss_setind;
+    reg [TAG_WIDTH-1:0] miss_tag;
+    reg [TAG_WIDTH-1:0] victim_tag;
+    reg victim_dirty;
+
+    reg victim_invalid;
+
+    integer way_index;
+    integer line_index;
+    integer select_index;
+    integer select_line_index;
 
     integer way_index;
     integer line_index;
 
-       // Find a matching valid cache line in the requested set.
+    // Find a matching valid cache line in the requested set.
     always @(*) begin
         hit = 1'b0;
         hit_way = {WAY_WIDTH{1'b0}};
@@ -218,6 +234,25 @@ module cache_controller
             if (valid[line_index] && tag[line_index] == i_addr_tag) begin
                 hit = 1'b1;
                 hit_way = way_index;
+            end
+        end
+    end
+
+    // Prefer an invalid way before evicting a valid line.
+    always @(*) begin
+        victim_way = {WAY_WIDTH{1'b0}};
+        victim_invalid = 1'b0;
+
+        for (select_index = 0;
+             select_index < NUM_WAYS;
+             select_index = select_index + 1) begin
+
+            select_line_index =
+                i_addr_setind * NUM_WAYS + select_index;
+
+            if (!victim_invalid && !valid[select_line_index]) begin
+                victim_way = select_index;
+                victim_invalid = 1'b1;
             end
         end
     end
