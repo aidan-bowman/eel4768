@@ -1,6 +1,7 @@
 `default_nettype none
 
 `define CLOG2(x) \
+   (x <= 1) ? 0 : \
    (x <= 2) ? 1 : \
    (x <= 4) ? 2 : \
    (x <= 8) ? 3 : \
@@ -371,11 +372,9 @@ module cache_controller
             case (state)
               IDLE: begin
                   if ((i_ren || i_wen) && !hit) begin
-                      miss_addr <= {
-                                    i_addr_tag,
+                      miss_addr <= {i_addr_tag,
                                     i_addr_setind,
-                                    i_addr_offset
-                                    };
+                                    i_addr_offset};
 
                       if (i_wen) begin
                           // Store miss: write through, no allocation.
