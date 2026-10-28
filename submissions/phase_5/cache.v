@@ -57,7 +57,7 @@ module cache
      parameter OFFSET_WIDTH = `CLOG2(BLOCK_SIZE),
      parameter SETIND_WIDTH = `CLOG2((CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS)),
      parameter TAG_WIDTH = 32 - OFFSET_WIDTH - SETIND_WIDTH,
-     parameter WAY_WIDTH = `CLOG2(NUM_WAYS),
+     parameter WAY_WIDTH = (NUM_WAYS <= 1) ? 1 : `CLOG2(NUM_WAYS),
      parameter NUM_SETS = (CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS)
     ) (
        // Global clock.
@@ -118,17 +118,23 @@ module cache
     wire [BLOCK_SIZE-1:0] mem_wr_be;
     wire [31:0]           data_rdata;
     wire [BLOCK_SIZE*8-1:0] data_mem_wr_data;
+    wire [SETIND_WIDTH-1:0] data_setind;
+    wire [OFFSET_WIDTH-1:0] data_offset;
+
+    wire [3:0]              store_mask;
+    wire [31:0]             store_data;
+    wire [OFFSET_WIDTH-1:0] store_offset;
     
     // Connect the cache controller.
     cache_controller
       #(
-         .NUM_WAYS(NUM_WAYS),
-         .CACHE_SIZE(CACHE_SIZE),
-         .BLOCK_SIZE(BLOCK_SIZE),
-         .OFFSET_WIDTH(OFFSET_WIDTH),
-         .SETIND_WIDTH(SETIND_WIDTH),
-         .TAG_WIDTH(TAG_WIDTH),
-         .WAY_WIDTH(WAY_WIDTH)
+        .NUM_WAYS(NUM_WAYS),
+        .CACHE_SIZE(CACHE_SIZE),
+        .BLOCK_SIZE(BLOCK_SIZE),
+        .OFFSET_WIDTH(OFFSET_WIDTH),
+        .SETIND_WIDTH(SETIND_WIDTH),
+        .TAG_WIDTH(TAG_WIDTH),
+        .WAY_WIDTH(WAY_WIDTH)
         ) controller (
                       .i_clk(i_clk),
                       .i_rst(i_rst),
@@ -142,38 +148,42 @@ module cache
                       .i_mask(i_mask),
                       .i_wdata(i_wdata),
                       .o_way(way),
+                      .o_store_mask(store_mask),
+                      .o_store_data(store_data),
+                      .o_store_offset(store_offset),
                       .o_refill(refill),
                       .o_update(update),
+                      .o_data_setind(data_setind),
+                      .o_data_offset(data_offset),
                       .o_mem_rd(o_mem_rd),
                       .o_mem_rd_addr(o_mem_rd_addr),
                       .i_mem_valid(i_mem_valid),
                       .o_mem_wr(o_mem_wr),
                       .o_mem_wr_addr(o_mem_wr_addr),
-                      .o_mem_wr_be(o_mem_wr_be)
-                      );
+                      .o_mem_wr_be(o_mem_wr_be));
 
     // Connect the cache data array.
     data_array
       #(
-         .NUM_WAYS(NUM_WAYS),
-         .CACHE_SIZE(CACHE_SIZE),
-         .BLOCK_SIZE(BLOCK_SIZE),
-         .OFFSET_WIDTH(OFFSET_WIDTH),
-         .SETIND_WIDTH(SETIND_WIDTH),
-         .WAY_WIDTH(WAY_WIDTH),
-         .NUM_SETS(NUM_SETS)
+        .NUM_WAYS(NUM_WAYS),
+        .CACHE_SIZE(CACHE_SIZE),
+        .BLOCK_SIZE(BLOCK_SIZE),
+        .OFFSET_WIDTH(OFFSET_WIDTH),
+        .SETIND_WIDTH(SETIND_WIDTH),
+        .WAY_WIDTH(WAY_WIDTH),
+        .NUM_SETS(NUM_SETS)
         ) data_storage (
                         .i_clk(i_clk),
                         .i_rst(i_rst),
                         .i_mask(i_mask),
                         .i_wdata(i_wdata),
                         .o_rdata(data_rdata),
-                        .i_addr_offset(i_addr_offset),
+                        .i_addr_offset(data_offset),
                         .i_refill(refill),
                         .i_update(update),
                         .i_mem_rd_data(i_mem_rd_data),
                         .o_mem_wr_data(data_mem_wr_data),
-                        .i_addr_setind(i_addr_setind),
+                        .i_addr_setind(data_setind),
                         .i_way(way)
                         );
 
@@ -191,50 +201,51 @@ module cache
              store_byte_index < 4;
              store_byte_index = store_byte_index + 1) begin
 
-            if (i_mask[store_byte_index] &&
-                (i_addr_offset + store_byte_index) < BLOCK_SIZE) begin
-
-                store_miss_data[(i_addr_offset + store_byte_index)*8 +: 8] =
-                                                                            i_wdata[store_byte_index*8 +: 8];
+            if (store_mask[store_byte_index]) begin
+                store_miss_data[(store_offset + store_byte_index)*8 +: 8] = store_data[store_byte_index*8 +: 8];
             end
         end
     end
 
-    assign o_mem_wr_data =
-                          store_miss_write ? store_miss_data : data_mem_wr_data;
+    assign o_mem_wr_data = store_miss_write ? store_miss_data : data_mem_wr_data;
 
 endmodule // cache
 
 module cache_controller
   #(
-	 parameter EVICT_POLICY = 0,
-     parameter NUM_WAYS = 1,
-     parameter CACHE_SIZE = 16,
-     parameter BLOCK_SIZE = 128,
-     parameter OFFSET_WIDTH = `CLOG2(BLOCK_SIZE),
-     parameter SETIND_WIDTH = `CLOG2((CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS)),
-     parameter TAG_WIDTH = 32 - OFFSET_WIDTH - SETIND_WIDTH,
-	 parameter WAY_WIDTH = `CLOG2(NUM_WAYS),
-	 parameter NUM_SETS = (CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS),
-	 parameter PREFETCH_EN = 0
+	parameter EVICT_POLICY = 0,
+    parameter NUM_WAYS = 1,
+    parameter CACHE_SIZE = 16,
+    parameter BLOCK_SIZE = 128,
+    parameter OFFSET_WIDTH = `CLOG2(BLOCK_SIZE),
+    parameter SETIND_WIDTH = `CLOG2((CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS)),
+    parameter TAG_WIDTH = 32 - OFFSET_WIDTH - SETIND_WIDTH,
+	parameter NUM_SETS = (CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS),
+    parameter WAY_WIDTH = (NUM_WAYS <= 1) ? 1 : `CLOG2(NUM_WAYS),
+	parameter PREFETCH_EN = 0
     ) (
-        input wire                    i_clk,
-        input wire                    i_rst,
+        input wire                     i_clk,
+        input wire                     i_rst,
        // CPU
-        input wire                    i_ren,
-        input wire                    i_wen,
-        output wire                   o_stall,
-        output wire                   o_store_miss,
+        input wire                     i_ren,
+        input wire                     i_wen,
+        output wire                    o_stall,
+        output wire                    o_store_miss,
        // cache
-        input wire [SETIND_WIDTH-1:0] i_addr_setind,
-        input wire [TAG_WIDTH-1:0]    i_addr_tag,
-        input wire [OFFSET_WIDTH-1:0] i_addr_offset,
-        input wire [3:0]             i_mask,
-        input wire [31:0]            i_wdata,
-        output wire [WAY_WIDTH-1:0]  o_way,
+        input wire [SETIND_WIDTH-1:0]  i_addr_setind,
+        input wire [TAG_WIDTH-1:0]     i_addr_tag,
+        input wire [OFFSET_WIDTH-1:0]  i_addr_offset,
+        input wire [3:0]               i_mask,
+        input wire [31:0]              i_wdata,
+        output wire [WAY_WIDTH-1:0]    o_way,
+        output wire [3:0]              o_store_mask,
+        output wire [31:0]             o_store_data,
+        output wire [OFFSET_WIDTH-1:0] o_store_offset,
        // data array
-        output wire                  o_refill,
-        output wire                  o_update,
+        output wire                    o_refill,
+        output wire                    o_update,
+        output wire [SETIND_WIDTH-1:0] o_data_setind,
+        output wire [OFFSET_WIDTH-1:0] o_data_offset,
        // main memory
         output wire                  o_mem_rd,
         output wire [31:0]           o_mem_rd_addr,
@@ -251,14 +262,14 @@ module cache_controller
     reg [WAY_WIDTH-1:0] lru_age[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
 
     // Controller state.
-    localparam IDLE       = 3'd0;
-    localparam WRITEBACK  = 3'd1;
-    localparam READ_REQ   = 3'd2;
-    localparam WAIT_MEM   = 3'd3;
-    localparam STORE_MISS = 3'd4;
-    localparam STORE_DONE = 3'd5;
+    localparam          IDLE       = 3'd0;
+    localparam          WRITEBACK  = 3'd1;
+    localparam          READ_REQ   = 3'd2;
+    localparam          WAIT_MEM   = 3'd3;
+    localparam          STORE_MISS = 3'd4;
+    localparam          STORE_DONE = 3'd5;
 
-    reg [2:0]  state;
+    reg [2:0]           state;
 
     reg [WAY_WIDTH-1:0] hit_way;
     reg [WAY_WIDTH-1:0] victim_way;
@@ -278,15 +289,22 @@ module cache_controller
     integer             lru_way_index;
     integer             lru_line_index;
     reg [WAY_WIDTH-1:0] old_lru_age;
-	 reg [WAY_WIDTH-1:0] max_lru_age;
+	reg [WAY_WIDTH-1:0] max_lru_age;
 
-    reg [31:0] miss_addr;
+    reg [31:0]          miss_addr;
+    reg [3:0]           miss_mask;
+    reg [31:0]          miss_wdata;
     reg [BLOCK_SIZE-1:0] store_miss_be;
+
+    reg                  store_completed;
 
     // Keep the CPU stalled until a read miss has been refilled.
     // A store miss completes after its write-through cycle.
-    assign o_stall = (state != IDLE && state != STORE_DONE) ||
-                     (state == IDLE && (i_ren || i_wen) && !hit);
+    assign o_stall = (state != IDLE) ||
+                     (state == IDLE &&
+                      !store_completed &&
+                      (i_ren || i_wen) &&
+                      !hit);
 
     assign o_store_miss = (state == STORE_MISS);
 
@@ -318,11 +336,9 @@ module cache_controller
     always @(*) begin
         store_miss_be = {BLOCK_SIZE{1'b0}};
 
-        for (byte_index = 0; byte_index < 4;
-             byte_index = byte_index + 1) begin
-            if (i_mask[byte_index] &&
-                (i_addr_offset + byte_index) < BLOCK_SIZE) begin
-                store_miss_be[i_addr_offset + byte_index] = 1'b1;
+        for (byte_index = 0; byte_index < 4; byte_index = byte_index + 1) begin
+            if (miss_mask[byte_index]) begin
+                store_miss_be[miss_addr[OFFSET_WIDTH-1:0] + byte_index] = 1'b1;
             end
         end
     end
@@ -330,51 +346,66 @@ module cache_controller
     // Controller state and cache metadata.
     always @(posedge i_clk) begin
         if (i_rst) begin
-            state <= IDLE;
-            miss_addr <= 32'b0;
-            miss_way <= {WAY_WIDTH{1'b0}};
-            victim_tag <= {TAG_WIDTH{1'b0}};
+            state        <= IDLE;
+            miss_addr    <= 32'b0;
+            miss_mask    <= 4'b0;
+            miss_wdata   <= 32'b0;
+            miss_way     <= {WAY_WIDTH{1'b0}};
+            victim_tag   <= {TAG_WIDTH{1'b0}};
             victim_dirty <= 1'b0;
+
+            store_completed <= 1'b0;
 
             for (meta_index = 0;
                  meta_index < CACHE_SIZE*1024/BLOCK_SIZE;
                  meta_index = meta_index + 1) begin
+<<<<<<< HEAD
                 tag[meta_index] <= {TAG_WIDTH{1'b0}};
                 valid[meta_index] <= 1'b0;
                 dirty[meta_index] <= 1'b0;
+=======
+                tag[meta_index]     <= {TAG_WIDTH{1'b0}};
+                valid[meta_index]   <= 1'b0;
+                dirty[meta_index]   <= 1'b0;
+>>>>>>> 3082368 (fix cache FINAL COMMIT)
                 lru_age[meta_index] <= {WAY_WIDTH{1'b0}};
             end
-        end else begin
+        end else begin // if (i_rst)
             // A store hit updates the cache line and marks it dirty.
-				if (state == IDLE && i_wen && hit) begin
-    				dirty[i_addr_setind * NUM_WAYS + hit_way] <= 1'b1;
-				end
+			if (state == IDLE && i_wen && hit) begin
+    			dirty[i_addr_setind * NUM_WAYS + hit_way] <= 1'b1;
+			end
 
-				// Update LRU ages when a cache line is accessed.
-				if (state == IDLE && (i_ren || i_wen) && hit) begin
+			// Update LRU ages when a cache line is accessed.
+			if (state == IDLE && (i_ren || i_wen) && hit) begin
    				old_lru_age = lru_age[i_addr_setind * NUM_WAYS + hit_way];
 
-    				for (lru_way_index = 0;
-         			lru_way_index < NUM_WAYS;
-         			lru_way_index = lru_way_index + 1) begin
+    			for (lru_way_index = 0;
+         			 lru_way_index < NUM_WAYS;
+         			 lru_way_index = lru_way_index + 1) begin
+                    
+        			lru_line_index = i_addr_setind * NUM_WAYS + lru_way_index;
 
-        				lru_line_index =
-                     		i_addr_setind * NUM_WAYS + lru_way_index;
-
-        		if (lru_way_index == hit_way) begin
-            	lru_age[lru_line_index] <= {WAY_WIDTH{1'b0}};
-        		end else if (lru_age[lru_line_index] < old_lru_age) begin
-            	lru_age[lru_line_index] <= lru_age[lru_line_index] + 1'b1;
-        		end
-    		end
-		end
-
+        		    if (lru_way_index == hit_way) begin
+            	        lru_age[lru_line_index] <= {WAY_WIDTH{1'b0}};
+        		    end else if (lru_age[lru_line_index] < old_lru_age) begin
+            	        lru_age[lru_line_index] <= lru_age[lru_line_index] + 1'b1;
+        		    end
+    		    end
+		    end // if (state == IDLE && (i_ren || i_wen) && hit)
+            
+            if (store_completed)
+              store_completed <= 1'b0;
+            
             case (state)
               IDLE: begin
-                  if ((i_ren || i_wen) && !hit) begin
+                  if (!store_completed && (i_ren || i_wen) && !hit) begin
                       miss_addr <= {i_addr_tag,
                                     i_addr_setind,
                                     i_addr_offset};
+                      
+                      miss_mask  <= i_mask;
+                      miss_wdata <= i_wdata;
 
                       if (i_wen) begin
                           // Store miss: write through, no allocation.
@@ -417,27 +448,27 @@ module cache_controller
                                             OFFSET_WIDTH] * NUM_WAYS + miss_way;
 
                       tag[meta_index] <=
-                  							miss_addr[31:OFFSET_WIDTH + SETIND_WIDTH];
-							 valid[meta_index] <= 1'b1;
-							 dirty[meta_index] <= 1'b0;
+                  						miss_addr[31:OFFSET_WIDTH + SETIND_WIDTH];
+					  valid[meta_index] <= 1'b1;
+					  dirty[meta_index] <= 1'b0;
 
-							 // The newly refilled line becomes the most recently used.
-							 for (lru_way_index = 0;
-     							 lru_way_index < NUM_WAYS;
-     							 lru_way_index = lru_way_index + 1) begin
+					  // The newly refilled line becomes the most recently used.
+					  for (lru_way_index = 0;
+     					   lru_way_index < NUM_WAYS;
+     					   lru_way_index = lru_way_index + 1) begin
 
-    							 lru_line_index =
-        						 	 miss_addr[OFFSET_WIDTH + SETIND_WIDTH - 1:OFFSET_WIDTH]
-        							 * NUM_WAYS + lru_way_index;
+    					  lru_line_index =
+        						 	      miss_addr[OFFSET_WIDTH + SETIND_WIDTH - 1:OFFSET_WIDTH]
+        							      * NUM_WAYS + lru_way_index;
 
-    							 if (lru_way_index == miss_way) begin
-        							 lru_age[lru_line_index] <= {WAY_WIDTH{1'b0}};
-    							 end else if (valid[lru_line_index]) begin
-							       lru_age[lru_line_index] <= lru_age[lru_line_index] + 1'b1;
-    							 end
-							 end
+    					  if (lru_way_index == miss_way) begin
+        					  lru_age[lru_line_index] <= {WAY_WIDTH{1'b0}};
+    					  end else if (valid[lru_line_index]) begin
+							  lru_age[lru_line_index] <= lru_age[lru_line_index] + 1'b1;
+    					  end
+					  end
 
-							 state <= IDLE;
+					  state <= IDLE;
                   end
               end
 
@@ -448,6 +479,7 @@ module cache_controller
 
               STORE_DONE: begin
                   // Release the stalled CPU without allocating the line.
+                  store_completed <= 1'b1;
                   state <= IDLE;
               end
 
@@ -475,45 +507,55 @@ module cache_controller
     end
 
     // Prefer an invalid way; otherwise evict the least recently used way.
-	 always @(*) begin
-    	 victim_way = {WAY_WIDTH{1'b0}};
-    	 victim_invalid = 1'b0;
-    	 max_lru_age = {WAY_WIDTH{1'b0}};
+	always @(*) begin
+    	victim_way = {WAY_WIDTH{1'b0}};
+    	victim_invalid = 1'b0;
+    	max_lru_age = {WAY_WIDTH{1'b0}};
 
-    	 // First look for an invalid way.
-    	 for (select_index = 0;
+    	// First look for an invalid way.
+    	for (select_index = 0;
          	 select_index < NUM_WAYS;
          	 select_index = select_index + 1) begin
 
-        	 select_line_index =
-            	 i_addr_setind * NUM_WAYS + select_index;
+        	select_line_index =
+            	               i_addr_setind * NUM_WAYS + select_index;
 
-        	 if (!victim_invalid && !valid[select_line_index]) begin
-            	 victim_way = select_index;
-            	 victim_invalid = 1'b1;
-        	 end
-    	 end
+        	if (!victim_invalid && !valid[select_line_index]) begin
+            	victim_way = select_index;
+            	victim_invalid = 1'b1;
+        	end
+    	end
 
-    	 // If every way is valid, select the line with the largest LRU age.
-    	 if (!victim_invalid) begin
-        	 victim_way = {WAY_WIDTH{1'b0}};
-        	 max_lru_age =
-            	 lru_age[i_addr_setind * NUM_WAYS];
+    	// If every way is valid, select the line with the largest LRU age.
+    	if (!victim_invalid) begin
+        	victim_way = {WAY_WIDTH{1'b0}};
+        	max_lru_age =
+            	         lru_age[i_addr_setind * NUM_WAYS];
 
-        	 for (select_index = 1;
+        	for (select_index = 1;
              	 select_index < NUM_WAYS;
              	 select_index = select_index + 1) begin
 
-            	 select_line_index =
-                	 i_addr_setind * NUM_WAYS + select_index;
+            	select_line_index =
+                	               i_addr_setind * NUM_WAYS + select_index;
 
-            	 if (lru_age[select_line_index] >= max_lru_age) begin
-                	 max_lru_age = lru_age[select_line_index];
-                	 victim_way = select_index;
-            	 end
-        	 end
-    	 end
-	 end
+            	if (lru_age[select_line_index] >= max_lru_age) begin
+                	max_lru_age = lru_age[select_line_index];
+                	victim_way = select_index;
+            	end
+        	end // for (select_index = 1;...
+    	end // if (!victim_invalid)
+	end // always @ (*)
+
+    assign o_store_mask   = miss_mask;
+    assign o_store_data   = miss_wdata;
+    assign o_store_offset = miss_addr[OFFSET_WIDTH-1:0];
+
+    assign o_data_setind = (state == IDLE) ? i_addr_setind
+                           : miss_addr[OFFSET_WIDTH +: SETIND_WIDTH];
+
+    assign o_data_offset = (state == IDLE) ? i_addr_offset
+                           : miss_addr[OFFSET_WIDTH-1:0];
     
 endmodule // cache_controller
 
@@ -524,7 +566,7 @@ module data_array
      parameter BLOCK_SIZE = 128,
      parameter OFFSET_WIDTH = `CLOG2(BLOCK_SIZE),
      parameter SETIND_WIDTH = `CLOG2((CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS)),
-     parameter WAY_WIDTH = `CLOG2(NUM_WAYS),
+     parameter WAY_WIDTH = (NUM_WAYS <= 1) ? 1 : `CLOG2(NUM_WAYS),
      parameter NUM_SETS = (CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS)
     ) (
        // global signals
