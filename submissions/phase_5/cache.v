@@ -206,13 +206,16 @@ endmodule // cache
 
 module cache_controller
   #(
+	 parameter EVICT_POLICY = 0,
      parameter NUM_WAYS = 1,
      parameter CACHE_SIZE = 16,
      parameter BLOCK_SIZE = 128,
      parameter OFFSET_WIDTH = `CLOG2(BLOCK_SIZE),
      parameter SETIND_WIDTH = `CLOG2((CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS)),
      parameter TAG_WIDTH = 32 - OFFSET_WIDTH - SETIND_WIDTH,
-     parameter WAY_WIDTH = `CLOG2(NUM_WAYS)
+	 parameter WAY_WIDTH = `CLOG2(NUM_WAYS),
+	 parameter NUM_SETS = (CACHE_SIZE*1024) / (BLOCK_SIZE*NUM_WAYS),
+	 parameter PREFETCH_EN = 0
     ) (
         input wire                    i_clk,
         input wire                    i_rst,
