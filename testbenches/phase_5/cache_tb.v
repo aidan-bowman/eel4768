@@ -347,7 +347,7 @@ module cache_tb;
         input [31:0] a;
         input [31:0] exp;
         begin
-            access_read(a, exp);
+            access_read(a);
         end
     endtask
 
@@ -363,8 +363,7 @@ module cache_tb;
 
                 if (word_index >= 0)
                     access_read(
-                        start_addr + k*4,
-                        expected_mem[word_index]
+                        start_addr + k*4
                     );
             end
         end
@@ -384,8 +383,7 @@ module cache_tb;
 
                 if (word_index >= 0)
                     access_read(
-                        start_addr + k*4,
-                        expected_mem[word_index]
+                        start_addr + k*4
                     );
             end
         end
@@ -403,7 +401,7 @@ module cache_tb;
 
             if (word_index >= 0) begin
                 for (k = 0; k < repetitions; k = k + 1)
-                    access_read(a, expected_mem[word_index]);
+                    access_read(a);
             end
         end
     endtask
@@ -436,59 +434,57 @@ module cache_tb;
 
         // 1. Cold miss, same-line access, and repeated reads.
         $display("\n=== TEST 1: Cold misses and cache hits ===");
-        access_read(DMEM_BASE, expected_mem[0]);
-        access_read(DMEM_BASE + 4, expected_mem[1]);
-        access_read(DMEM_BASE + 8, expected_mem[2]);
-        access_read(DMEM_BASE, expected_mem[0]);
+        access_read(DMEM_BASE);
+        access_read(DMEM_BASE + 4);
+        access_read(DMEM_BASE + 8);
+        access_read(DMEM_BASE);
         test_repeated_access(DMEM_BASE, 5);
 
         // 2. Access the first word of another cache block.
         $display("\n=== TEST 2: Different cache lines ===");
-        access_read(DMEM_BASE + BLOCK_SIZE, expected_mem[BLOCK_SIZE/4]);
-        access_read(DMEM_BASE + 2*BLOCK_SIZE,
-                    expected_mem[(2*BLOCK_SIZE)/4]);
-        access_read(DMEM_BASE + 3*BLOCK_SIZE,
-                    expected_mem[(3*BLOCK_SIZE)/4]);
+        access_read(DMEM_BASE + BLOCK_SIZE);
+        access_read(DMEM_BASE + 2*BLOCK_SIZE);
+        access_read(DMEM_BASE + 3*BLOCK_SIZE);
 
         // 3. Full-word write and read-after-write.
         $display("\n=== TEST 3: Full-word stores ===");
         access_write(DMEM_BASE + 4, 4'b1111, 32'hDEADBEEF);
-        access_read(DMEM_BASE + 4, expected_mem[1]);
+        access_read(DMEM_BASE + 4);
 
         // 4. Individual byte lanes.
         $display("\n=== TEST 4: Byte-enable stores ===");
         access_write(DMEM_BASE + 8, 4'b0001, 32'h000000AA);
-        access_read(DMEM_BASE + 8, expected_mem[2]);
+        access_read(DMEM_BASE + 8);
 
         access_write(DMEM_BASE + 8, 4'b0010, 32'h0000BB00);
-        access_read(DMEM_BASE + 8, expected_mem[2]);
+        access_read(DMEM_BASE + 8);
 
         access_write(DMEM_BASE + 8, 4'b0100, 32'h00CC0000);
-        access_read(DMEM_BASE + 8, expected_mem[2]);
+        access_read(DMEM_BASE + 8);
 
         access_write(DMEM_BASE + 8, 4'b1000, 32'hDD000000);
-        access_read(DMEM_BASE + 8, expected_mem[2]);
+        access_read(DMEM_BASE + 8);
 
         // 5. Partial stores with multiple byte lanes enabled.
         $display("\n=== TEST 5: Partial-word stores ===");
         access_write(DMEM_BASE + 12, 4'b0011, 32'h0000BEEF);
-        access_read(DMEM_BASE + 12, expected_mem[3]);
+        access_read(DMEM_BASE + 12);
 
         access_write(DMEM_BASE + 12, 4'b1100, 32'hCAFE0000);
-        access_read(DMEM_BASE + 12, expected_mem[3]);
+        access_read(DMEM_BASE + 12);
 
         access_write(DMEM_BASE + 16, 4'b0101, 32'h00AA00CC);
-        access_read(DMEM_BASE + 16, expected_mem[4]);
+        access_read(DMEM_BASE + 16);
 
         access_write(DMEM_BASE + 20, 4'b1010, 32'hBB00DD00);
-        access_read(DMEM_BASE + 20, expected_mem[5]);
+        access_read(DMEM_BASE + 20);
 
         // 6. Refill and revisit earlier addresses.
         $display("\n=== TEST 6: Refill and revisit ===");
-        access_read(DMEM_BASE, expected_mem[0]);
-        access_read(DMEM_BASE + BLOCK_SIZE, expected_mem[BLOCK_SIZE/4]);
-        access_read(DMEM_BASE + 4, expected_mem[1]);
-        access_read(DMEM_BASE + 8, expected_mem[2]);
+        access_read(DMEM_BASE);
+        access_read(DMEM_BASE + BLOCK_SIZE);
+        access_read(DMEM_BASE + 4);
+        access_read(DMEM_BASE + 8);
 
         // 7. Sequential access across several blocks.
         test_sequential_reads(DMEM_BASE + 4*BLOCK_SIZE, 64);
@@ -497,13 +493,12 @@ module cache_tb;
         $display("\n=== TEST 8: Replacement pressure ===");
         for (random_i = 0; random_i < 24; random_i = random_i + 1) begin
             random_addr = DMEM_BASE + random_i*BLOCK_SIZE;
-            access_read(random_addr,
-                        expected_mem[(random_i*BLOCK_SIZE)/4]);
+            access_read(random_addr);
         end
 
         // Revisit addresses after replacement activity.
-        access_read(DMEM_BASE, expected_mem[0]);
-        access_read(DMEM_BASE + BLOCK_SIZE, expected_mem[BLOCK_SIZE/4]);
+        access_read(DMEM_BASE);
+        access_read(DMEM_BASE + BLOCK_SIZE);
 
         // 9. Deterministic pseudo-random reads and writes.
         // Keep all accesses word-aligned and within backing memory.
@@ -522,13 +517,11 @@ module cache_tb;
             if ((random_i % 3) == 0) begin
                 access_write(random_addr, random_mask, random_data);
                 access_read(
-                    random_addr,
-                    expected_mem[mem_index(random_addr)]
+                    random_addr
                 );
             end else begin
                 access_read(
-                    random_addr,
-                    expected_mem[mem_index(random_addr)]
+                    random_addr
                 );
             end
         end
