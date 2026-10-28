@@ -240,11 +240,45 @@ module cache_controller
         output wire [BLOCK_SIZE-1:0] o_mem_wr_be
        );
 
+    // Cache metadata.
+    reg [TAG_WIDTH-1:0] tag[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
+    reg                 dirty[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
+    reg                 valid[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
+    reg [WAY_WIDTH-1:0] lru_age[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
+
+    // Controller state.
+    localparam IDLE       = 3'd0;
+    localparam WRITEBACK  = 3'd1;
+    localparam READ_REQ   = 3'd2;
+    localparam WAIT_MEM   = 3'd3;
+    localparam STORE_MISS = 3'd4;
+    localparam STORE_DONE = 3'd5;
+
+    reg [2:0] state;
+
+    reg [WAY_WIDTH-1:0] hit_way;
+    reg [WAY_WIDTH-1:0] victim_way;
+    reg [WAY_WIDTH-1:0] miss_way;
+
+    reg [TAG_WIDTH-1:0] victim_tag;
+    reg                 victim_dirty;
+    reg                 victim_invalid;
+
+    wire hit;
+
+    integer byte_index;
+    integer meta_index;
+    integer way_index;
+    integer line_index;
+    integer select_index;
+    integer select_line_index;
+    integer             lru_way_index;
+    integer             lru_line_index;
+    reg [WAY_WIDTH-1:0] old_lru_age;
+	 reg [WAY_WIDTH-1:0] max_lru_age;
+
     reg [31:0] miss_addr;
     reg [BLOCK_SIZE-1:0] store_miss_be;
-
-    integer              byte_index;
-    integer              meta_index;
 
     // Keep the CPU stalled until a read miss has been refilled.
     // A store miss completes after its write-through cycle.
@@ -308,14 +342,32 @@ module cache_controller
             end
         end else begin
             // A store hit updates the cache line and marks it dirty.
-            if (state == IDLE && i_wen && hit) begin
-                dirty[i_addr_setind * NUM_WAYS + hit_way] <= 1'b1;
-            end
+				if (state == IDLE && i_wen && hit) begin
+    				dirty[i_addr_setind * NUM_WAYS + hit_way] <= 1'b1;
+				end
+
+				// Update LRU ages when a cache line is accessed.
+				if (state == IDLE && (i_ren || i_wen) && hit) begin
+   				old_lru_age = lru_age[i_addr_setind * NUM_WAYS + hit_way];
+
+    				for (lru_way_index = 0;
+         			lru_way_index < NUM_WAYS;
+         			lru_way_index = lru_way_index + 1) begin
+
+        				lru_line_index =
+                     		i_addr_setind * NUM_WAYS + lru_way_index;
+
+        		if (lru_way_index == hit_way) begin
+            	lru_age[lru_line_index] <= {WAY_WIDTH{1'b0}};
+        		end else if (lru_age[lru_line_index] < old_lru_age) begin
+            	lru_age[lru_line_index] <= lru_age[lru_line_index] + 1'b1;
+        		end
+    		end
+		end
 
             case (state)
               IDLE: begin
                   if ((i_ren || i_wen) && !hit) begin
-                      miss_addr <= i_addr_tag;
                       miss_addr <= {
                                     i_addr_tag,
                                     i_addr_setind,
@@ -363,11 +415,27 @@ module cache_controller
                                             OFFSET_WIDTH] * NUM_WAYS + miss_way;
 
                       tag[meta_index] <=
-                                        miss_addr[31:OFFSET_WIDTH + SETIND_WIDTH];
-                      valid[meta_index] <= 1'b1;
-                      dirty[meta_index] <= 1'b0;
+                  							miss_addr[31:OFFSET_WIDTH + SETIND_WIDTH];
+							 valid[meta_index] <= 1'b1;
+							 dirty[meta_index] <= 1'b0;
 
-                      state <= IDLE;
+							 // The newly refilled line becomes the most recently used.
+							 for (lru_way_index = 0;
+     							 lru_way_index < NUM_WAYS;
+     							 lru_way_index = lru_way_index + 1) begin
+
+    							 lru_line_index =
+        						 	 miss_addr[OFFSET_WIDTH + SETIND_WIDTH - 1:OFFSET_WIDTH]
+        							 * NUM_WAYS + lru_way_index;
+
+    							 if (lru_way_index == miss_way) begin
+        							 lru_age[lru_line_index] <= {WAY_WIDTH{1'b0}};
+    							 end else if (valid[lru_line_index]) begin
+							       lru_age[lru_line_index] <= lru_age[lru_line_index] + 1'b1;
+    							 end
+							 end
+
+							 state <= IDLE;
                   end
               end
 
@@ -388,37 +456,6 @@ module cache_controller
         end
     end
     
-    reg [TAG_WIDTH-1:0] tag[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
-    reg                 dirty[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
-    reg                 valid[(CACHE_SIZE*1024/BLOCK_SIZE)-1:0];
-
-    // Controller state.
-    localparam          IDLE       = 3'd0;
-    localparam          WRITEBACK  = 3'd1;
-    localparam          READ_REQ   = 3'd2;
-    localparam          WAIT_MEM   = 3'd3;
-    localparam          STORE_MISS = 3'd4;
-    localparam          STORE_DONE = 3'd5;
-
-    reg [2:0]           state;
-
-    reg                 hit;
-    reg [WAY_WIDTH-1:0] hit_way;
-    reg [WAY_WIDTH-1:0] victim_way;
-    reg [WAY_WIDTH-1:0] miss_way;
-
-    reg [SETIND_WIDTH-1:0] miss_setind;
-    reg [TAG_WIDTH-1:0]    miss_tag;
-    reg [TAG_WIDTH-1:0]    victim_tag;
-    reg                    victim_dirty;
-
-    reg                    victim_invalid;
-
-    integer                way_index;
-    integer                line_index;
-    integer                select_index;
-    integer                select_line_index;
-
     // Find a matching valid cache line in the requested set.
     always @(*) begin
         hit = 1'b0;
@@ -435,24 +472,46 @@ module cache_controller
         end
     end
 
-    // Prefer an invalid way before evicting a valid line.
-    always @(*) begin
-        victim_way = {WAY_WIDTH{1'b0}};
-        victim_invalid = 1'b0;
+    // Prefer an invalid way; otherwise evict the least recently used way.
+	 always @(*) begin
+    	 victim_way = {WAY_WIDTH{1'b0}};
+    	 victim_invalid = 1'b0;
+    	 max_lru_age = {WAY_WIDTH{1'b0}};
 
-        for (select_index = 0;
-             select_index < NUM_WAYS;
-             select_index = select_index + 1) begin
+    	 // First look for an invalid way.
+    	 for (select_index = 0;
+         	 select_index < NUM_WAYS;
+         	 select_index = select_index + 1) begin
 
-            select_line_index =
-                               i_addr_setind * NUM_WAYS + select_index;
+        	 select_line_index =
+            	 i_addr_setind * NUM_WAYS + select_index;
 
-            if (!victim_invalid && !valid[select_line_index]) begin
-                victim_way = select_index;
-                victim_invalid = 1'b1;
-            end
-        end
-    end
+        	 if (!victim_invalid && !valid[select_line_index]) begin
+            	 victim_way = select_index;
+            	 victim_invalid = 1'b1;
+        	 end
+    	 end
+
+    	 // If every way is valid, select the line with the largest LRU age.
+    	 if (!victim_invalid) begin
+        	 victim_way = {WAY_WIDTH{1'b0}};
+        	 max_lru_age =
+            	 lru_age[i_addr_setind * NUM_WAYS];
+
+        	 for (select_index = 1;
+             	 select_index < NUM_WAYS;
+             	 select_index = select_index + 1) begin
+
+            	 select_line_index =
+                	 i_addr_setind * NUM_WAYS + select_index;
+
+            	 if (lru_age[select_line_index] >= max_lru_age) begin
+                	 max_lru_age = lru_age[select_line_index];
+                	 victim_way = select_index;
+            	 end
+        	 end
+    	 end
+	 end
     
 endmodule // cache_controller
 
