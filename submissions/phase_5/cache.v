@@ -338,7 +338,7 @@ module cache_controller
                 tag[meta_index] <= {TAG_WIDTH{1'b0}};
                 valid[meta_index] <= 1'b0;
                 dirty[meta_index] <= 1'b0;
-				lru_age[meta_index] <= {WAY_WIDTH{1'b0}};
+                lru_age[meta_index] <= {WAY_WIDTH{1'b0}};
             end
         end else begin
             // A store hit updates the cache line and marks it dirty.
