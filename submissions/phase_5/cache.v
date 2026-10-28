@@ -254,24 +254,23 @@ module cache_controller
     localparam STORE_MISS = 3'd4;
     localparam STORE_DONE = 3'd5;
 
-    reg [2:0] state;
+    reg [2:0]  state;
 
     reg [WAY_WIDTH-1:0] hit_way;
     reg [WAY_WIDTH-1:0] victim_way;
     reg [WAY_WIDTH-1:0] miss_way;
+    reg                 hit;
 
     reg [TAG_WIDTH-1:0] victim_tag;
     reg                 victim_dirty;
     reg                 victim_invalid;
 
-    wire hit;
-
-    integer byte_index;
-    integer meta_index;
-    integer way_index;
-    integer line_index;
-    integer select_index;
-    integer select_line_index;
+    integer             byte_index;
+    integer             meta_index;
+    integer             way_index;
+    integer             line_index;
+    integer             select_index;
+    integer             select_line_index;
     integer             lru_way_index;
     integer             lru_line_index;
     reg [WAY_WIDTH-1:0] old_lru_age;
