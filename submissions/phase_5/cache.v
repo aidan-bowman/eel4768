@@ -248,39 +248,34 @@ module cache_controller
 
     // Keep the CPU stalled until a read miss has been refilled.
     // A store miss completes after its write-through cycle.
-    assign o_stall =
-                    (state != IDLE && state != STORE_DONE) ||
-                    (state == IDLE && (i_ren || i_wen) && !hit);
+    assign o_stall = (state != IDLE && state != STORE_DONE) ||
+                     (state == IDLE && (i_ren || i_wen) && !hit);
 
     assign o_store_miss = (state == STORE_MISS);
 
     assign o_mem_rd = (state == READ_REQ);
 
-    assign o_mem_rd_addr = {
-                            miss_addr[31:OFFSET_WIDTH],
+    assign o_mem_rd_addr = {miss_addr[31:OFFSET_WIDTH],
                             {OFFSET_WIDTH{1'b0}}
                             };
 
     assign o_mem_wr = (state == WRITEBACK) ||
                       (state == STORE_MISS);
 
-    assign o_mem_wr_addr =
-                          (state == WRITEBACK)
+    assign o_mem_wr_addr = (state == WRITEBACK)
       ? {victim_tag, miss_addr[OFFSET_WIDTH+SETIND_WIDTH-1:OFFSET_WIDTH],
          {OFFSET_WIDTH{1'b0}}}
-                          : {miss_addr[31:OFFSET_WIDTH], {OFFSET_WIDTH{1'b0}}};
+                           : {miss_addr[31:OFFSET_WIDTH], {OFFSET_WIDTH{1'b0}}};
 
-    assign o_mem_wr_be =
-                        (state == WRITEBACK) ? {BLOCK_SIZE{1'b1}} :
-                        (state == STORE_MISS) ? store_miss_be :
-                        {BLOCK_SIZE{1'b0}};
+    assign o_mem_wr_be = (state == WRITEBACK) ? {BLOCK_SIZE{1'b1}} :
+                         (state == STORE_MISS) ? store_miss_be :
+                         {BLOCK_SIZE{1'b0}};
 
     assign o_refill = (state == WAIT_MEM) && i_mem_valid;
 
     assign o_update = (state == IDLE) && i_wen && hit;
 
-    assign o_way =
-                  (state == IDLE) ? (hit ? hit_way : victim_way) : miss_way;
+    assign o_way = (state == IDLE) ? (hit ? hit_way : victim_way) : miss_way;
 
     // Generate byte enables for a store miss.
     always @(*) begin
@@ -407,6 +402,7 @@ module cache_controller
 
     reg [2:0]           state;
 
+    reg                 hit;
     reg [WAY_WIDTH-1:0] hit_way;
     reg [WAY_WIDTH-1:0] victim_way;
     reg [WAY_WIDTH-1:0] miss_way;

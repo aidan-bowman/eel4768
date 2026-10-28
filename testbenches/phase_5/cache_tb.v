@@ -20,7 +20,7 @@ module cache_tb;
     reg [31:0] addr;
     reg [3:0] mask;
     reg [31:0] wdata;
-    wire ready;
+    wire stall;
     wire [31:0] rdata;
 
     wire mem_rd;
@@ -56,7 +56,7 @@ module cache_tb;
         .i_addr(addr),
         .i_mask(mask),
         .i_wdata(wdata),
-        .o_ready(ready),
+        .o_stall(stall),
         .o_rdata(rdata),
         .o_mem_rd(mem_rd),
         .o_mem_rd_addr(mem_rd_addr),
@@ -144,12 +144,12 @@ module cache_tb;
             timeout = 0;
             @(posedge clk);
             #1;
-            while (!ready && timeout < 1000) begin
+            while (stall && timeout < 1000) begin
                 @(posedge clk);
                 #1;
                 timeout = timeout + 1;
             end
-            if (!ready) begin
+            if (stall) begin
                 $display("ERROR: read timeout at %08x", a);
                 errors = errors + 1;
             end else begin
@@ -182,12 +182,12 @@ module cache_tb;
             timeout = 0;
             @(posedge clk);
             #1;
-            while (!ready && timeout < 1000) begin
+            while (stall && timeout < 1000) begin
                 @(posedge clk);
                 #1;
                 timeout = timeout + 1;
             end
-            if (!ready) begin
+            if (stall) begin
                 $display("ERROR: write timeout at %08x", a);
                 errors = errors + 1;
             end
