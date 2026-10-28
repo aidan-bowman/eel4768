@@ -109,6 +109,9 @@ module hart_tb;
     );
 
     initial begin
+        $dumpfile("phase5.vcd");
+        $dumpvars(0, hart_tb);
+        
         clk = 1'b0;
         forever #5 clk = ~clk;
     end
