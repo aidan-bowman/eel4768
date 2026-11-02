@@ -1,0 +1,69 @@
+#+TITLE: Phase 6 TODO
+#+STARTUP: overview
+
+* alu.v
+** TODO copy/merge over skeleton from course_files
+** TODO implement integer multiplication module
+** TODO implement integer division module
+** connect mul and div ops to ALU control logic
+** lint after all changes
+* decoder.v
+** TODO copy/merge over skeleton
+** TODO decode M ops
+** TODO decode F ops
+** TODO decode CSR ops
+** TODO reg file reporting for each reg (int vs fp)
+** lint after all changes
+* rf.v
+** TODO copy/merge over skeleton
+** TODO registers for 32 FP regs
+** control logic for FP regs
+** lint after all changes
+* hart.v
+** TODO copy/merge over skeleton
+** TODO implement FP reg paths
+** TODO instantiate the FPU module
+** implement FP hazards
+** multi-cycle stalls
+** implement new retire ports
+** TODO OPTIONAL: refactor hart to be cleaner and more readable
+ideas:
+move complex logic to their own modules
+** lint after all changes
+* hzrdctrl.v
+** TODO implement FP hazards
+** lint after all changes
+* fpu.v
+** DONE copy over skeleton
+** TODO instruction decoding
+** TODO FP move and compare ops
+** TODO FP and integer conversion ops (DO AS OWN SUBMODULE)
+** TODO FP addition (DO AS OWN SUBMODULE)
+** TODO FP multiplication (DO AS OWN SUBMODULE)
+** fused airthmetic ops
+** TODO FP division (DO AS OWN SUBMODULE)
+** TODO FP square-root (DO AS OWN SUBMODULE)
+** CSR instructions
+** lint after all changes
+* cache.v
+this module shouldn't have to be touched. it's not modified in phase_6.
+however, if phase_5 comes back with less than a 100%, our module is DISFUNCTIONAL and needs to be fixed.
+lint if changed!
+* imm.v
+shouldn't change at all... lint if changed
+* testing
+** TODO CREATE NEW TESTBENCH
+this needs to be double-checked as matching expected values BEFORE we need to use it.
+*** TODO read README.md, phase_6.pdf
+*** TODO check over traces (random_program.hex is the loaded input, random_dmem.hex is the EXPECTED RAM at the end)
+*** copy over functional TB code
+*** rewrite output to check expected ram
+** TODO create testbenches for submodules
+since the TB just checks if memory looks as expected at end of program,
+it'd probably be best to generate testbenches for submodules that might cause errors
+*** TODO make TB for fpu.v
+*** TODO make TB for rf.v
+** run linter on all files BEFORE SUBMITTING
+* notes
+** bug tracker
+- [ ]
