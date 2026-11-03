@@ -1,71 +1,80 @@
 #+TITLE: Phase 6 TODO
 #+STARTUP: overview
+#+TODO: TODO(t) NEXT(n) INPROG(i) WAITING(w) | DONE(d)
+#+TAGS: aj(a) brandon(b) logan(l)
 
-* alu.v
-** TODO copy/merge over portlist from course_files
-** TODO implement integer division module
-** connect in multiplier module
-** connect mul and div ops to ALU control logic
-** lint after all changes
-* multiplier
-** TODO writeup portlist
-** implement multiplier (i'm thinking shift-and-add)
-* decoder.v
-** TODO copy/merge over portlist
-** TODO decode M ops
-** TODO decode F ops
-** TODO decode CSR ops
-** TODO reg file reporting for each reg (int vs fp)
-** lint after all changes
-* rf.v
-** TODO copy/merge over portlist
-** TODO registers for 32 FP regs
-** control logic for FP regs
-** lint after all changes
-* hart.v
-** TODO copy/merge over portlist
-** TODO implement FP reg paths
-** TODO instantiate the FPU module
-** implement FP hazards
-** multi-cycle stalls
-** implement new retire ports
-** TODO OPTIONAL: refactor hart to be cleaner and more readable
+
+* alu.v                                                               :logan:
+** NEXT [#A] copy/merge over portlist from course_files
+** TODO [#A] implement integer division module
+** WAITING [#A] connect in multiplier module
+** WAITING [#A] connect mul and div ops to ALU control logic
+** WAITING [#A] lint after all changes
+* multiplier                                                             :aj:
+** NEXT [#A] writeup portlist
+** TODO [#A] implement multiplier (i'm thinking shift-and-add)
+* decoder.v                                                              :aj:
+** NEXT [#A] copy/merge over portlist
+** TODO [#A] decode M ops
+** TODO [#A] decode F ops
+** TODO [#B] decode CSR ops
+** TODO [#A] reg file reporting for each reg (int vs fp)
+** WAITING [#A] lint after all changes
+* rf.v                                                                :logan:
+** NEXT [#A] copy/merge over portlist
+** TODO [#A] registers for 32 FP regs
+** TODO [#A] control logic for FP regs
+** WAITING [#A] lint after all changes
+* hart.v                                                   :aj:brandon:logan:
+** NEXT [#A] copy/merge over portlist
+** TODO [#A] implement FP reg paths
+** WAITING [#A] instantiate the FPU module
+** WAITING [#B] implement FP hazards
+** WAITING [#B] multi-cycle stalls
+** TODO [#A] implement new retire ports
+** OPTIONAL: refactor hart to be cleaner and more readable
 ideas:
 move complex logic to their own modules
-** lint after all changes
-* hzrdctrl.v
-** TODO implement FP hazards
-** lint after all changes
-* fpu.v
+** WAITING [#A] lint after all changes
+* hzrdctrl.v                                                     :aj:brandon:
+** WAITING [#B] implement FP hazards
+** WAITING [#B] lint after all changes
+* fpu.v                                                    :aj:brandon:logan:
 ** DONE copy over skeleton
-** TODO instruction decoding
-** TODO FP move and compare ops
-** TODO FP and integer conversion ops
-** TODO FP multiplier-adder (own module)
-** fused arithmetic ops
-** TODO FP division (DO AS OWN SUBMODULE)
-** TODO FP square-root (DO AS OWN SUBMODULE)
-** CSR instructions
-** lint after all changes
+** NEXT [#A] instruction decoding
+** NEXT [#A] FP move and compare ops
+** NEXT [#A] FP and integer conversion ops
+** NEXT [#B] FP multiplier-adder (own module)
+** NEXT [#B] fused arithmetic ops
+** NEXT [#A] FP division (DO AS OWN SUBMODULE)
+** NEXT [#B] FP square-root (DO AS OWN SUBMODULE)
+** TODO [#C] CSR instructions
+** TODO [#C] mixed instructions
+** WAITING [#A] lint after all changes
 * cache.v
 this module shouldn't have to be touched. it's not modified in phase_6.
 however, if phase_5 comes back with less than a 100%, our module is DISFUNCTIONAL and needs to be fixed.
 lint if changed!
 * imm.v
 shouldn't change at all... lint if changed
-* testing
-** TODO CREATE NEW TESTBENCH
+* testing                                                           :brandon:
+** TODO [#A] CREATE NEW TESTBENCH
 this needs to be double-checked as matching expected values BEFORE we need to use it.
-*** TODO read README.md, phase_6.pdf
-*** TODO check over traces (random_program.hex is the loaded input, random_dmem.hex is the EXPECTED RAM at the end)
-*** copy over functional TB code
-*** rewrite output to check expected ram
-** TODO create testbenches for submodules
+*** NEXT read README.md, phase_6.pdf
+DEADLINE: <2026-11-05 Thu>
+*** NEXT check over traces (random_program.hex is the loaded input, random_dmem.hex is the EXPECTED RAM at the end)
+DEADLINE: <2026-11-05 Thu>
+*** TODO copy over functional TB code
+DEADLINE: <2026-11-05 Thu>
+*** TODO rewrite output to check expected ram
+DEADLINE: <2026-11-07 Sat>
+** TODO [#B] create testbenches for submodules
 since the TB just checks if memory looks as expected at end of program,
 it'd probably be best to generate testbenches for submodules that might cause errors
 *** TODO make TB for fpu.v
 *** TODO make TB for rf.v
-** run linter on all files BEFORE SUBMITTING
+*** TODO make TB for multiplier.v
+** WAITING [#A] run linter on all files BEFORE SUBMITTING
 * notes
 ** bug tracker
 - [ ]
