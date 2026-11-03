@@ -2,25 +2,28 @@
 #+STARTUP: overview
 
 * alu.v
-** TODO copy/merge over skeleton from course_files
-** TODO implement integer multiplication module
+** TODO copy/merge over portlist from course_files
 ** TODO implement integer division module
+** connect in multiplier module
 ** connect mul and div ops to ALU control logic
 ** lint after all changes
+* multiplier
+** TODO writeup portlist
+** implement multiplier (i'm thinking shift-and-add)
 * decoder.v
-** TODO copy/merge over skeleton
+** TODO copy/merge over portlist
 ** TODO decode M ops
 ** TODO decode F ops
 ** TODO decode CSR ops
 ** TODO reg file reporting for each reg (int vs fp)
 ** lint after all changes
 * rf.v
-** TODO copy/merge over skeleton
+** TODO copy/merge over portlist
 ** TODO registers for 32 FP regs
 ** control logic for FP regs
 ** lint after all changes
 * hart.v
-** TODO copy/merge over skeleton
+** TODO copy/merge over portlist
 ** TODO implement FP reg paths
 ** TODO instantiate the FPU module
 ** implement FP hazards
@@ -37,10 +40,9 @@ move complex logic to their own modules
 ** DONE copy over skeleton
 ** TODO instruction decoding
 ** TODO FP move and compare ops
-** TODO FP and integer conversion ops (DO AS OWN SUBMODULE)
-** TODO FP addition (DO AS OWN SUBMODULE)
-** TODO FP multiplication (DO AS OWN SUBMODULE)
-** fused airthmetic ops
+** TODO FP and integer conversion ops
+** TODO FP multiplier-adder (own module)
+** fused arithmetic ops
 ** TODO FP division (DO AS OWN SUBMODULE)
 ** TODO FP square-root (DO AS OWN SUBMODULE)
 ** CSR instructions
