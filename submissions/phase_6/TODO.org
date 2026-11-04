@@ -20,10 +20,10 @@
 ** TODO [#B] decode CSR ops
 ** TODO [#A] reg file reporting for each reg (int vs fp)
 ** WAITING [#A] lint after all changes
-* NEXT rf.v                                                           :logan:
-** NEXT [#A] copy/merge over portlist
-** TODO [#A] registers for 32 FP regs
-** TODO [#A] control logic for FP regs
+* NEXT rf.v                                                        :aj:logan:
+** DONE [#A] copy/merge over portlist
+** NEXT [#A] registers for 32 FP regs
+** NEXT [#A] control logic for FP regs
 ** WAITING [#A] lint after all changes
 * TODO hart.v                                              :aj:brandon:logan:
 ** NEXT [#A] copy/merge over portlist
