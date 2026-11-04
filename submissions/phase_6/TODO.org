@@ -4,28 +4,28 @@
 #+TAGS: aj(a) brandon(b) logan(l)
 
 
-* alu.v                                                               :logan:
+* NEXT alu.v                                                          :logan:
 ** NEXT [#A] copy/merge over portlist from course_files
+** NEXT [#A] connect in multiplier module
 ** TODO [#A] implement integer division module
-** WAITING [#A] connect in multiplier module
 ** WAITING [#A] connect mul and div ops to ALU control logic
 ** WAITING [#A] lint after all changes
-* multiplier                                                             :aj:
-** NEXT [#A] writeup portlist
-** TODO [#A] implement multiplier (i'm thinking shift-and-add)
-* decoder.v                                                              :aj:
+* DONE multiplier.v                                                      :aj:
+** DONE [#A] writeup portlist
+** DONE [#A] implement multiplier (i'm thinking shift-and-add)
+* NEXT decoder.v                                                         :aj:
 ** NEXT [#A] copy/merge over portlist
 ** TODO [#A] decode M ops
 ** TODO [#A] decode F ops
 ** TODO [#B] decode CSR ops
 ** TODO [#A] reg file reporting for each reg (int vs fp)
 ** WAITING [#A] lint after all changes
-* rf.v                                                                :logan:
+* NEXT rf.v                                                           :logan:
 ** NEXT [#A] copy/merge over portlist
 ** TODO [#A] registers for 32 FP regs
 ** TODO [#A] control logic for FP regs
 ** WAITING [#A] lint after all changes
-* hart.v                                                   :aj:brandon:logan:
+* TODO hart.v                                              :aj:brandon:logan:
 ** NEXT [#A] copy/merge over portlist
 ** TODO [#A] implement FP reg paths
 ** WAITING [#A] instantiate the FPU module
@@ -36,10 +36,10 @@
 ideas:
 move complex logic to their own modules
 ** WAITING [#A] lint after all changes
-* hzrdctrl.v                                                     :aj:brandon:
+* WAITING hzrdctrl.v                                             :aj:brandon:
 ** WAITING [#B] implement FP hazards
 ** WAITING [#B] lint after all changes
-* fpu.v                                                    :aj:brandon:logan:
+* NEXT fpu.v                                               :aj:brandon:logan:
 ** DONE copy over skeleton
 ** NEXT [#A] instruction decoding
 ** NEXT [#A] FP move and compare ops
@@ -57,7 +57,7 @@ however, if phase_5 comes back with less than a 100%, our module is DISFUNCTIONA
 lint if changed!
 * imm.v
 shouldn't change at all... lint if changed
-* testing                                                           :brandon:
+* NEXT testing                                                      :brandon:
 ** TODO [#A] CREATE NEW TESTBENCH
 this needs to be double-checked as matching expected values BEFORE we need to use it.
 *** NEXT read README.md, phase_6.pdf
