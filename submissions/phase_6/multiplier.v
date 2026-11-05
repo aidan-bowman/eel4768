@@ -1,3 +1,4 @@
+// 8-cycle shift-and-add multiplier
 module multiplier (
                    input wire         i_clk,
                    input wire         i_rst,
