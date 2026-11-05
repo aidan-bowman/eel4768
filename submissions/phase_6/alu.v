@@ -646,12 +646,83 @@ module alu (
                    unsigned_less : signed_less;
 
 
+	// ============================================================
+    // 5. BRANCH SET-LESS-THAN OUTPUT
     // ============================================================
-    // 6. ALU RESULT MULTIPLEXER
+ 
+	wire		mul_start;
+	wire [63:0]	mul_product;
+	wire		mul_busy;
+	wire		mul_ready;
+
+	wire		mul_a_signed;
+	wire		mul_b_signed;
+
+	reg 		mul_started;
+	reg 		mul_valid;
+	reg  [31:0]	mul_result;
+
+	// The first four M-extension operations are multilpication.
+	assign mul_start =  i_mext &&
+						!i_opsel[2] &&
+						!mul_started &&
+						!mul_valid;
+
+	// The signedness for each multiplication operation.
+	assign mul_a_signed = (i_opsel == 3'b001) ||
+						  (i_opsel == 3'b010);
+
+	assign mul_a_signed = (i_opsel == 3'b001);
+
+	multiplier mul_unit (
+        .i_clk         (i_clk),
+        .i_rst         (i_rst),
+        .i_start       (mul_start),
+        .i_mula        (i_op1),
+        .i_mulb        (i_op2),
+        .i_mula_signed (mul_a_signed),
+        .i_mulb_signed (mul_b_signed),
+        .o_prod        (mul_product),
+        .o_busy        (mul_busy),
+        .o_ready       (mul_ready)
+    );
+
+	// Capture the completed result and hold it until the instruction advances.
+	always @(posedge i_clk) begin
+		if (i_rst) begin
+			mul_start	<= 1'b0;
+			mul_valid	<= 1'b0;
+			mul_result	<= 32'b0;
+		end
+		else if (i_advance) begin
+			mul_started	<= 1'b0;
+			mul_valid	<= 1'b0;
+		end
+		else begin
+			if (mul_start)
+				mul_started	<= 1'b1;
+
+			if (mul_ready) begin
+				mul_result	<= (i_opsel == 3'b000) ?
+								mul_product[31:0] :
+								mul_product[63:32];
+
+				mul_valid	<=1'b1;
+			end
+		end
+	end
+
+	// Keep the instruction in EX until its multiplication is complete.
+	assign o_busy = i_mext && !i_opsel[2] && !mul_valid;
+
+	
+    // ============================================================
+    // 7. ALU RESULT MULTIPLEXER
     // ============================================================
 
-    assign o_result =
-        (i_opsel == 3'b000) ? cla_sum :
+    assign o_result = i_mext ?
+		(i_opsel[2] ? 32'b0 : mul_result) :
+		(i_opsel == 3'b000) ? cla_sum :
         (i_opsel == 3'b001) ? shift_left_result :
         (i_opsel == 3'b010) ? {31'b0, signed_less} :
         (i_opsel == 3'b011) ? {31'b0, unsigned_less} :
