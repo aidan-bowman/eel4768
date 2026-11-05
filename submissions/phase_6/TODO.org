@@ -14,11 +14,11 @@
 ** DONE [#A] writeup portlist
 ** DONE [#A] implement multiplier (i'm thinking shift-and-add)
 * NEXT decoder.v                                                         :aj:
-** NEXT [#A] copy/merge over portlist
-** TODO [#A] decode M ops
-** TODO [#A] decode F ops
-** TODO [#B] decode CSR ops
-** TODO [#A] reg file reporting for each reg (int vs fp)
+** DONE [#A] copy/merge over portlist
+** DONE [#A] decode M ops
+** DONE [#A] decode F ops
+** DONE [#B] decode CSR ops
+** DONE [#A] reg file reporting for each reg (int vs fp)
 ** WAITING [#A] lint after all changes
 * DONE rf.v                                                        :aj:logan:
 ** DONE [#A] copy/merge over portlist
