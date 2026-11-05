@@ -1,0 +1,2 @@
+module compare ();
+endmodule // compare
