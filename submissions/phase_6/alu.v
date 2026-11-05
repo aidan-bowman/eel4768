@@ -3,9 +3,15 @@
 // The arithmetic logic unit (ALU) is responsible for performing the core
 // calculations of the processor. It takes two 32-bit operands and outputs
 // a 32 bit result based on the selection operation - addition, comparison,
-// shift, or logical operation. This ALU is a purely combinational block, so
-// you should not attempt to add any registers or pipeline it.
+// shift, or logical operation. Every RV32I operation is purely
+// combinational. In phase 6 the ALU also performs the RV32M multiply and
+// divide instructions, which may be combinational or take several cycles
+// (see `documentation/phase_6.pdf`).
 module alu (
+    // Global clock and synchronous active-high reset (used by an iterative
+    // multiplier or divider).
+    input  wire        i_clk,
+    input  wire        i_rst,
     // Major operation selection.
     // 3'b000: addition/subtraction if `i_sub` asserted
     // 3'b001: shift left logical
@@ -15,6 +21,15 @@ module alu (
     // 3'b101: shift right logical/arithmetic if `i_arith` asserted
     // 3'b110: or
     // 3'b111: and
+    // When `i_mext` is asserted, this is the M instruction's funct3 instead:
+    // 3'b000: mul    - low 32 bits of op1 * op2
+    // 3'b001: mulh   - high 32 bits of signed op1 * signed op2
+    // 3'b010: mulhsu - high 32 bits of signed op1 * unsigned op2
+    // 3'b011: mulhu  - high 32 bits of unsigned op1 * unsigned op2
+    // 3'b100: div    - signed op1 / op2, rounded toward zero
+    // 3'b101: divu   - unsigned op1 / op2
+    // 3'b110: rem    - signed remainder, same sign as op1
+    // 3'b111: remu   - unsigned remainder
     input  wire [ 2:0] i_opsel,
     // When asserted, addition operations should subtract instead.
     // This is only used for `i_opsel == 3'b000` (addition/subtraction).
@@ -27,6 +42,11 @@ module alu (
     // When asserted, right shifts should be treated as arithmetic instead of
     // logical. This is only used for `i_opsel == 3'b101` (shift right).
     input  wire        i_arith,
+    // Asserted while an RV32M instruction is in the execute stage.
+    input  wire        i_mext,
+    // Asserted when the instruction in the execute stage moves on at the next
+    // rising edge. A finished M result is held until then.
+    input  wire        i_advance,
     // First 32-bit input operand.
     input  wire [31:0] i_op1,
     // Second 32-bit input operand.
@@ -38,7 +58,10 @@ module alu (
     output wire        o_eq,
     // Set less than result. This is used downstream to determine if a
     // branch should be taken.
-    output wire        o_slt
+    output wire        o_slt,
+    // Asserted while an M operation is still running; the instruction must
+    // stay in the execute stage until it drops.
+    output wire        o_busy
 );
     // Your implementation goes under here
     // ------------------------------------
@@ -623,12 +646,83 @@ module alu (
                    unsigned_less : signed_less;
 
 
+	// ============================================================
+    // 5. BRANCH SET-LESS-THAN OUTPUT
     // ============================================================
-    // 6. ALU RESULT MULTIPLEXER
+ 
+	wire		mul_start;
+	wire [63:0]	mul_product;
+	wire		mul_busy;
+	wire		mul_ready;
+
+	wire		mul_a_signed;
+	wire		mul_b_signed;
+
+	reg 		mul_started;
+	reg 		mul_valid;
+	reg  [31:]	mul_result;
+
+	// The first four M-extension operations are multilpication.
+	assign mul_start =  i_mext &&
+						!i_opsel[2] &&
+						!mul_started &&
+						!mul_valid;
+
+	// The signedness for each multiplication operation.
+	assign mul_a_signed = (i_opsel == 3'b001) ||
+						  (i_opsel == 3'b010);
+
+	assign mul_a_signed = (i_opsel == 3'b001);
+
+	multiplier mul_unit (
+        .i_clk         (i_clk),
+        .i_rst         (i_rst),
+        .i_start       (mul_start),
+        .i_mula        (i_op1),
+        .i_mulb        (i_op2),
+        .i_mula_signed (mul_a_signed),
+        .i_mulb_signed (mul_b_signed),
+        .o_prod        (mul_product),
+        .o_busy        (mul_busy),
+        .o_ready       (mul_ready)
+    );
+
+	// Capture the completed result and hold it until the instruction advances.
+	always @(posedge i_clk) begin
+		if (i_rst) begin
+			mul_start	<= 1'b0;
+			mul_valid	<= 1'b0;
+			mul_result	<= 32'b0;
+		end
+		else if (i_advance) begin
+			mul_started	<= 1'b0;
+			mul_valid	<= 1'b0;
+		end
+		else begin
+			if (mul_start)
+				mul_started	<= 1'b1;
+
+			if (mul_ready) begin
+				mul_result	<= (i_opsel == 3'b000) ?
+								mul_product[31:0] :
+								mul_product[63:32];
+
+				mul_valid	<=1'b1;
+			end
+		end
+	end
+
+	// Keep the instruction in EX until its multiplication is complete.
+	assign o_busy = i_mext && !i_opsel[2] && !mul_valid;
+
+	
+    // ============================================================
+    // 7. ALU RESULT MULTIPLEXER
     // ============================================================
 
-    assign o_result =
-        (i_opsel == 3'b000) ? cla_sum :
+    assign o_result = i_mext ?
+		(i_opsel[2] ? 32'b0 : mul_result) :
+		(i_opsel == 3'b000) ? cla_sum :
         (i_opsel == 3'b001) ? shift_left_result :
         (i_opsel == 3'b010) ? {31'b0, signed_less} :
         (i_opsel == 3'b011) ? {31'b0, unsigned_less} :

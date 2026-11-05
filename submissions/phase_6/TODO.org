@@ -44,6 +44,7 @@ move complex logic to their own modules
 ** NEXT [#A] instruction decoding
 ** NEXT [#A] FP move and compare ops
 ** NEXT [#A] FP and integer conversion ops
+** NEXT [#A] FP compare ops
 ** DONE [#B] FP multiplier-adder (own module)
 ** NEXT [#B] fused arithmetic ops
 ** NEXT [#A] FP division (DO AS OWN SUBMODULE)

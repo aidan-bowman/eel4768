@@ -60,6 +60,8 @@ module fpu (
     // fpu_decoder
     // fpu_multadd
     // fpu_rounder
+    // fpu_compare
+    // fpu_classify
 endmodule // fpu
 
 `default_nettype wire
