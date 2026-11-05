@@ -660,7 +660,7 @@ module alu (
 
 	reg 		mul_started;
 	reg 		mul_valid;
-	reg  [31:]	mul_result;
+	reg  [31:0]	mul_result;
 
 	// The first four M-extension operations are multilpication.
 	assign mul_start =  i_mext &&
