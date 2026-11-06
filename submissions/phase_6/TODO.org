@@ -44,8 +44,13 @@ move complex logic to their own modules
 ** NEXT [#A] instruction decoding
 ** NEXT [#A] FP move and compare ops
 ** NEXT [#A] FP and integer conversion ops
-** NEXT [#A] FP compare ops
-** DONE [#B] FP multiplier-adder (own module)
+** DONE [#A] FP compare ops
+** NEXT [#B] FP multiplier-adder (own module)
+written, but needs updating
+- [ ] we need to round inside this module. no more 38-bit output pls
+- [ ] use input classification masks! would greatly reduce module complexity
+- [X] probably rename fpa, b, c to rs1, 2, 3
+- [ ] shorten the header
 ** NEXT [#B] fused arithmetic ops
 ** NEXT [#A] FP division (DO AS OWN SUBMODULE)
 ** NEXT [#B] FP square-root (DO AS OWN SUBMODULE)

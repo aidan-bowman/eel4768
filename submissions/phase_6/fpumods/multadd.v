@@ -5,14 +5,13 @@
  *   Multi-cycle floating-point multiply-add datapath.
  *
  *   Computes:
- *       (i_fpa * i_fpb) + i_fbc
+ *       (i_rs1 * i_rs2) + i_rs3
  *
  *   The multiplier is an external iterative multiplier module.
  *   The addend can be bypassed using i_add_en.
  *
  * Intermediate result format (o_prod):
  *
- *   [63:38] : Reserved (zero)
  *   [37:28] : Signed 10-bit unbiased exponent (two's complement)
  *   [27]    : Result sign
  *   [26:3]  : 24-bit normalized significand
@@ -43,6 +42,9 @@
  *
  * TODO / Limitations:
  *
+ *   - we need to round the output instead of keeping this dumb 38-bit output
+ *   - input masks aren't implemented yet! would reduce the complexity of the module
+ *   - shorten the header, lol
  *   - IEEE-754 special cases (NaN, infinity, zero, invalid
  *     operations, overflow and underflow) require additional
  *     handling.
@@ -62,9 +64,9 @@ module fpu_multadd (
     input  wire        i_rst,
     input  wire        i_start,
 
-    input  wire [31:0] i_fpa,
-    input  wire [31:0] i_fpb,
-    input  wire [31:0] i_fbc,
+    input  wire [31:0] i_rs1,
+    input  wire [31:0] i_rs2,
+    input  wire [31:0] i_rs3,
 
     input  wire        i_add_en,
 
@@ -434,9 +436,9 @@ module fpu_multadd (
 
                 S_IDLE: begin
                     if (i_start) begin
-                        a_reg      <= i_fpa;
-                        b_reg      <= i_fpb;
-                        c_reg      <= i_fbc;
+                        a_reg      <= i_rs1;
+                        b_reg      <= i_rs2;
+                        c_reg      <= i_rs3;
                         add_en_reg <= i_add_en;
                         state      <= S_MUL_START;
                     end

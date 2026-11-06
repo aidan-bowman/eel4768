@@ -1,6 +1,6 @@
 `default_nettype none
 
-`define CANON_NAN 32'x7FC00000
+`define CANON_NAN 32'x7FC00000 // move to a parameter?
 
 // The floating-point unit implements the RISC-V F extension (single
 // precision, IEEE 754-2008) and the Zicsr instructions for its control and
@@ -56,12 +56,38 @@ module fpu (
     // traps as illegal and changes no state.
     output wire        o_rm_trap
 );
+
+    /******************************************
+     * REGISTER CLASSIFICATION
+     * 
+     * generates one-hot masks classifying registers
+     * commonly used across op modules
+     */
+    wire [9:0] w_rs1_mask;
+    wire [9:0] w_rs2_mask;
+    wire [9:0] w_rs3_mask;
+
+    classify u_classify_rs1 (
+                             .i_fp   (i_rs1),
+                             .o_mask (w_rs1_mask)
+                             );
+
+    classify u_classify_rs2 (
+                             .i_fp   (i_rs2),
+                             .o_mask (w_rs2_mask)
+                             );
+
+    classify u_classify_rs3 (
+                             .i_fp   (i_rs3),
+                             .o_mask (w_rs3_mask)
+                             );
+    
     // TODO: implement following modules:
     // fpu_decoder
     // fpu_multadd
     // fpu_rounder
     // fpu_compare
-    // fpu_classify
+    // fpu_compare
 endmodule // fpu
 
 `default_nettype wire
