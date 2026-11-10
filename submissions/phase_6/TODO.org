@@ -13,7 +13,7 @@
 * DONE multiplier.v                                                      :aj:
 ** DONE [#A] writeup portlist
 ** DONE [#A] implement multiplier (i'm thinking shift-and-add)
-* NEXT decoder.v                                                         :aj:
+* DONE decoder.v                                                         :aj:
 ** DONE [#A] copy/merge over portlist
 ** DONE [#A] decode M ops
 ** DONE [#A] decode F ops
@@ -25,11 +25,11 @@
 ** DONE [#A] registers for 32 FP regs
 ** DONE [#A] control logic for FP regs
 ** TODO [#A] lint after all changes
-* TODO hart.v                                              :aj:brandon:logan:
-** NEXT [#A] copy/merge over portlist
-** TODO [#A] implement FP reg paths
-** WAITING [#A] instantiate the FPU module
-** WAITING [#B] implement FP hazards
+* NEXT hart.v                                              :aj:brandon:logan:
+** DONE [#A] copy/merge over portlist
+** NEXT [#A] implement FP reg paths
+** NEXT [#A] instantiate the FPU module
+** NEXT [#B] implement FP hazards
 ** WAITING [#B] multi-cycle stalls
 ** TODO [#A] implement new retire ports
 ** OPTIONAL: refactor hart to be cleaner and more readable
@@ -41,7 +41,7 @@ move complex logic to their own modules
 ** WAITING [#B] lint after all changes
 * NEXT fpu.v                                               :aj:brandon:logan:
 ** DONE copy over skeleton
-** NEXT [#A] instruction decoding
+** INPROG [#A] instruction decoding
 ** NEXT [#A] FP move and compare ops
 ** NEXT [#A] FP and integer conversion ops
 ** DONE [#A] FP compare ops
