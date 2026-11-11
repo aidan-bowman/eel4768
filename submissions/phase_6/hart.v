@@ -214,7 +214,6 @@ module hart
     reg [31:0] if_id_pc;
     reg [31:0] if_id_nextpc; // for retire interface
     reg [31:0] if_id_inst;
-	reg if_id_valid;
 
     always @(posedge i_clk) begin
         if (i_rst) begin
@@ -222,7 +221,6 @@ module hart
             if_id_pc   <= 32'b0;
             if_id_inst <= 32'b0;
             if_id_nextpc <= 32'b0;
-			if_id_valid <= 1'b0;
         end else if (if_hold || cache_hold) begin
             // don't update anything
         end else begin
@@ -276,7 +274,17 @@ module hart
     wire        memw;
     wire        memu;
 
-    wire [3:0]  rd_sel;
+    wire        mext;
+    wire        fpu_en;
+
+    wire        frs1_en;
+    wire        frs2_en;
+    wire        frs3_en;
+
+    wire [4:0]  rs3;
+    wire        frd_en;
+
+    wire [4:0]  rd_sel;
 
     wire        pc_alu_sel;
 
@@ -328,6 +336,16 @@ module hart
                      .o_rd_sel(rd_sel),
 
                      .o_pc_sel(pc_alu_sel)
+
+                     .o_mext(mext),
+                     .o_fpu(fpu_en),
+
+                     .o_frs1_en(frs1_en),
+                     .o_frs2_en(frs2_en),
+                     .o_frs3_en(frs3_en),
+
+                     .o_rs3(rs3),
+                     .o_frd_en(frd_en),
                      );
 
     // ================================================================
@@ -336,6 +354,10 @@ module hart
 
     wire [31:0] rs1_data;
     wire [31:0] rs2_data;
+    
+    wire [31:0] frs1_data;
+    wire [31:0] frs2_data;
+    wire [31:0] frs3_data;
 
     wire [31:0] writeback_data;
 
@@ -356,6 +378,19 @@ module hart
 
                .i_rs2_raddr(rs2),
                .o_rs2_rdata(rs2_data),
+
+               .i_frs1_raddr(if_id_inst[19:15]),
+               .o_frs1_rdata(frs1_data),
+
+               .i_frs2_raddr(if_id_inst[24:20]),
+               .o_frs2_rdata(frs2_data),
+
+               .i_frs3_raddr(rs3),
+               .o_frs3_rdata(frs3_data),
+
+               .i_frd_wen(mem_wb_frd_en),
+               .i_frd_waddr(mem_wb_frd),
+               .i_frd_wdata(mem_wb_fpu_fp_res),
 
                .i_rd_waddr(rf_rd_waddr),
                .i_rd_wdata(mem_wb_writeback_data)
@@ -401,12 +436,28 @@ module hart
     reg        id_ex_memw;
     reg        id_ex_memu;
 
-    reg [3:0]  id_ex_rd_sel;
+    reg [4:0]  id_ex_rd_sel;
 
     reg        id_ex_legal;
     reg        id_ex_halt;
     reg        id_ex_trap;
 
+    reg [31:0] id_ex_frs1_data;
+    reg [31:0] id_ex_frs2_data;
+    reg [31:0] id_ex_frs3_data;
+
+    reg [4:0]  id_ex_frs1;
+    reg [4:0]  id_ex_frs2;
+    reg [4:0]  id_ex_frs3;
+
+    reg        id_ex_frs1_en;
+    reg        id_ex_frs2_en;
+    reg        id_ex_frs3_en;
+
+    reg        id_ex_fpu_en;
+
+    reg        id_ex_frd_en;
+    reg [4:0]  id_ex_frd;
     
     always @(posedge i_clk) begin
         if (i_rst) begin
@@ -429,7 +480,7 @@ module hart
             id_ex_branch_equal    <= 1'b0;
             id_ex_branch_unsigned <= 1'b0;
             id_ex_branch_invert   <= 1'b0;
-            id_ex_jump             <= 1'b0;
+            id_ex_jump            <= 1'b0;
             id_ex_pc_alu_sel      <= 1'b0;
             id_ex_memread         <= 1'b0;
             id_ex_memwrite        <= 1'b0;
@@ -438,10 +489,28 @@ module hart
             id_ex_memh            <= 1'b0;
             id_ex_memw            <= 1'b0;
             id_ex_memu            <= 1'b0;
-            id_ex_rd_sel          <= 4'b0;
+            id_ex_rd_sel          <= 5'b0;
             id_ex_legal           <= 1'b0;
             id_ex_halt            <= 1'b0;
             id_ex_trap            <= 1'b0;
+            
+            id_ex_frs1_data       <= 32'b0;
+            id_ex_frs2_data       <= 32'b0;
+            id_ex_frs3_data       <= 32'b0;
+
+            id_ex_frs1            <= 5'b0;
+            id_ex_frs2            <= 5'b0;
+            id_ex_frs3            <= 5'b0;
+                              
+
+            id_ex_frs1_en         <= 1'b0;
+            id_ex_frs2_en         <= 1'b0;
+            id_ex_frs3_en         <= 1'b0;
+
+            id_ex_fpu_en          <= 1'b0;
+
+            id_ex_frd_en          <= 1'b0;
+            id_ex_frd             <= 5'b0;
         end else if (cache_hold) begin
             // Hold all ID/EX registers while the cache is waiting.
         end else if (id_nop) begin
@@ -464,7 +533,7 @@ module hart
             id_ex_branch_equal    <= 1'b0;
             id_ex_branch_unsigned <= 1'b0;
             id_ex_branch_invert   <= 1'b0;
-            id_ex_jump             <= 1'b0;
+            id_ex_jump            <= 1'b0;
             id_ex_pc_alu_sel      <= 1'b0;
             id_ex_memread         <= 1'b0;
             id_ex_memwrite        <= 1'b0;
@@ -473,10 +542,28 @@ module hart
             id_ex_memh            <= 1'b0;
             id_ex_memw            <= 1'b0;
             id_ex_memu            <= 1'b0;
-            id_ex_rd_sel          <= 4'b0;
+            id_ex_rd_sel          <= 5'b0;
             id_ex_legal           <= 1'b0;
             id_ex_halt            <= 1'b0;
             id_ex_trap            <= 1'b0;
+            
+            id_ex_frs1_data       <= 32'b0;
+            id_ex_frs2_data       <= 32'b0;
+            id_ex_frs3_data       <= 32'b0;
+
+            id_ex_frs1            <= 5'b0;
+            id_ex_frs2            <= 5'b0;
+            id_ex_frs3            <= 5'b0;
+                              
+
+            id_ex_frs1_en         <= 1'b0;
+            id_ex_frs2_en         <= 1'b0;
+            id_ex_frs3_en         <= 1'b0;
+
+            id_ex_fpu_en          <= 1'b0;
+
+            id_ex_frd_en          <= 1'b0;
+            id_ex_frd             <= 5'b0;
         end else begin
             id_ex_pc              <= if_id_pc;
             id_ex_nextpc          <= if_id_nextpc;
@@ -497,7 +584,7 @@ module hart
             id_ex_branch_equal    <= branch_equal;
             id_ex_branch_unsigned <= branch_unsigned;
             id_ex_branch_invert   <= branch_invert;
-            id_ex_jump             <= inst_jump;
+            id_ex_jump            <= inst_jump;
             id_ex_pc_alu_sel      <= pc_alu_sel;
             id_ex_memread         <= decoder_dmem_ren;
             id_ex_memwrite        <= decoder_dmem_wen;
@@ -510,6 +597,23 @@ module hart
             id_ex_legal           <= legal;
             id_ex_halt            <= halt;
             id_ex_trap            <= trap;
+            
+            id_ex_frs1_data       <= frs1_data;
+            id_ex_frs2_data       <= frs2_data;
+            id_ex_frs3_data       <= frs3_data;
+
+            id_ex_frs1            <= rs1;
+            id_ex_frs2            <= rs2;
+            id_ex_frs3            <= rs3;
+
+            id_ex_frs1_en         <= frs1_en;
+            id_ex_frs2_en         <= frs2_en;
+            id_ex_frs3_en         <= frs3_en;
+
+            id_ex_fpu_en          <= fpu_en;
+
+            id_ex_frd_en          <= frd_en;
+            id_ex_frd             <= frd_en ? if_id_inst[11:7] : 5'd0;
         end
     end
 
@@ -646,6 +750,32 @@ module hart
                        id_ex_jump &&
                        !id_ex_halt;
 
+    // ================================================================
+    // FPU
+    // ================================================================
+
+    wire fpu_busy; // used for cache_hold
+    wire fpu_fp_res;
+    wire fpu_int_res;
+    wire fpu_fflags;
+    wire fpu_rm_trap;
+
+    fpu fpu (
+             .i_clk(i_clk),
+             .i_rst(i_rst),
+             .i_inst(id_ex_inst),
+             .i_valid(id_ex_legal & id_ex_fpu_en),
+             .i_advance(~cache_hold), // we advance when the cache is not held
+             .i_frs1(id_ex_frs1_data),
+             .i_frs2(id_ex_frs2_data),
+             .i_frs3(id_ex_frs3_data),
+             .i_xrs1(id_ex_rs1_data),
+             .o_fp_result(fpu_fp_res),
+             .o_int_result(fpu_int_res),
+             .o_fflags(fpu_fflags),
+             .o_busy(fpu_busy),
+             .o_rm_trap(fpu_rm_trap)
+             );
 
     // ================================================================
     // REGISTER EX/MEM
@@ -673,62 +803,104 @@ module hart
     reg        ex_mem_memw;
     reg        ex_mem_memu;
 
-    reg [3:0]  ex_mem_rd_sel;
+    reg [4:0]  ex_mem_rd_sel;
 
     reg        ex_mem_legal;
     reg        ex_mem_halt;
     reg        ex_mem_trap;
 
+    reg [31:0] ex_mem_fpu_fp_res;
+    reg [31:0] ex_mem_fpu_int_res;
+    reg [ 4:0] ex_mem_fpu_fflags;
+    reg        ex_mem_frd_en;
+    reg [4:0]  ex_mem_frd;
+
+    reg [4:0]  ex_mem_frs1;
+    reg [31:0] ex_mem_frs1_data;
+    reg [4:0]  ex_mem_frs2;
+    reg [31:0] ex_mem_frs2_data;
+    reg [4:0]  ex_mem_frs3;
+    reg [31:0] ex_mem_frs3_data;
+
+
     always @(posedge i_clk) begin
         if (i_rst) begin
-            ex_mem_alu_result <= 32'b0;
-            ex_mem_rs2_data   <= 32'b0;
-            ex_mem_pc         <= 32'b0;
+            ex_mem_alu_result  <= 32'b0;
+            ex_mem_rs2_data    <= 32'b0;
+            ex_mem_pc          <= 32'b0;
 			ex_mem_nextpc      <= 32'b0;
-            ex_mem_imm        <= 32'b0;
-			ex_mem_inst       <= 32'b0;
-			ex_mem_rs1_data   <= 32'b0;
-			ex_mem_rs1        <= 5'd0;
-			ex_mem_rs2        <= 5'd0;
-            ex_mem_rd         <= 5'd0;
-            ex_mem_memread    <= 1'b0;
-            ex_mem_memwrite   <= 1'b0;
-            ex_mem_memalign   <= 2'b0;
-            ex_mem_memb       <= 1'b0;
-            ex_mem_memh       <= 1'b0;
-            ex_mem_memw       <= 1'b0;
-            ex_mem_memu       <= 1'b0;
-            ex_mem_rd_sel     <= 4'b0;
-            ex_mem_legal      <= 1'b0;
-            ex_mem_halt       <= 1'b0;
-            ex_mem_trap       <= 1'b0;
+            ex_mem_imm         <= 32'b0;
+			ex_mem_inst        <= 32'b0;
+			ex_mem_rs1_data    <= 32'b0;
+			ex_mem_rs1         <= 5'd0;
+			ex_mem_rs2         <= 5'd0;
+            ex_mem_rd          <= 5'd0;
+            ex_mem_memread     <= 1'b0;
+            ex_mem_memwrite    <= 1'b0;
+            ex_mem_memalign    <= 2'b0;
+            ex_mem_memb        <= 1'b0;
+            ex_mem_memh        <= 1'b0;
+            ex_mem_memw        <= 1'b0;
+            ex_mem_memu        <= 1'b0;
+            ex_mem_rd_sel      <= 5'b0;
+            ex_mem_legal       <= 1'b0;
+            ex_mem_halt        <= 1'b0;
+            ex_mem_trap        <= 1'b0;
+            
+            ex_mem_fpu_fp_res  <= 32'b0;
+            ex_mem_fpu_int_res <= 32'b0;
+            ex_mem_fpu_fflags  <= 5'b0;
+            
+            ex_mem_frd_en      <= 1'b0;
+            ex_mem_frd         <= 5'b0;
+            
+            ex_mem_frs1        <= 5'b0;
+            ex_mem_frs1_data   <= 32'b0;
+            ex_mem_frs2        <= 5'b0;
+            ex_mem_frs2_data   <= 32'b0;
+            ex_mem_frs3        <= 5'b0;
+            ex_mem_frs3_data   <= 32'b0;
 		end else if (cache_hold) begin
         	// Hold all EX/MEM registers while the cache is waiting.
         end else begin
-            ex_mem_alu_result <= alu_result;
-            ex_mem_rs2_data   <= id_ex_rs2_data;
-            ex_mem_pc         <= id_ex_pc;
-			ex_mem_nextpc     <= id_ex_nextpc;
-			ex_mem_inst       <= id_ex_inst;
-			ex_mem_rs1_data   <= forward_rs1_data;
-            ex_mem_rs2_data   <= forward_rs2_data;
-			ex_mem_rs1        <= id_ex_rs1;
-			ex_mem_rs2        <= id_ex_rs2;
-            ex_mem_imm        <= id_ex_imm;
-            ex_mem_rd         <= id_ex_rd;
-            ex_mem_memread    <= id_ex_memread;
-            ex_mem_memwrite   <= id_ex_memwrite;
-            ex_mem_memalign   <= id_ex_memalign;
-            ex_mem_memb       <= id_ex_memb;
-            ex_mem_memh       <= id_ex_memh;
-            ex_mem_memw       <= id_ex_memw;
-            ex_mem_memu       <= id_ex_memu;
-            ex_mem_rd_sel     <= id_ex_rd_sel;
-            ex_mem_legal      <= id_ex_legal;
-            ex_mem_halt       <= id_ex_halt;
-            ex_mem_trap       <= id_ex_trap;
-        end
-    end
+            ex_mem_alu_result  <= alu_result;
+            ex_mem_rs2_data    <= id_ex_rs2_data;
+            ex_mem_pc          <= id_ex_pc;
+			ex_mem_nextpc      <= id_ex_nextpc;
+			ex_mem_inst        <= id_ex_inst;
+			ex_mem_rs1_data    <= forward_rs1_data;
+            ex_mem_rs2_data    <= forward_rs2_data;
+			ex_mem_rs1         <= id_ex_rs1;
+			ex_mem_rs2         <= id_ex_rs2;
+            ex_mem_imm         <= id_ex_imm;
+            ex_mem_rd          <= id_ex_rd;
+            ex_mem_memread     <= id_ex_memread;
+            ex_mem_memwrite    <= id_ex_memwrite;
+            ex_mem_memalign    <= id_ex_memalign;
+            ex_mem_memb        <= id_ex_memb;
+            ex_mem_memh        <= id_ex_memh;
+            ex_mem_memw        <= id_ex_memw;
+            ex_mem_memu        <= id_ex_memu;
+            ex_mem_rd_sel      <= id_ex_rd_sel;
+            ex_mem_legal       <= id_ex_legal;
+            ex_mem_halt        <= id_ex_halt;
+            ex_mem_trap        <= id_ex_trap || fpu_rm_trap;
+            
+            ex_mem_fpu_fp_res  <= fpu_fp_res;
+            ex_mem_fpu_int_res <= fpu_int_res;
+            ex_mem_fpu_fflags  <= fpu_fflags;
+            
+            ex_mem_frd_en      <= id_ex_frd_en;
+            ex_mem_frd         <= id_ex_frd;
+            
+            ex_mem_frs1        <= id_ex_frs1;
+            ex_mem_frs1_data   <= id_ex_frs1_data;
+            ex_mem_frs2        <= id_ex_frs2;
+            ex_mem_frs2_data   <= id_ex_frs2_data;
+            ex_mem_frs3        <= id_ex_frs2;
+            ex_mem_frs3_data   <= id_ex_frs2_data;
+        end // else: !if(cache_hold)
+    end // always @ (posedge i_clk)
 
     // ================================================================
     // STAGE 4: MEMORY
@@ -773,7 +945,8 @@ module hart
                         !dmem_misaligned;
 
 	assign cache_hold = icache_stall ||
-                    	((dcache_ren || dcache_wen) && dcache_stall);
+                    	((dcache_ren || dcache_wen) && dcache_stall) ||
+                        fpu_busy; // this should probably be moved elsewhere
 
     assign dcache_mask =
                         ex_mem_memw ? 4'b1111 :
@@ -891,9 +1064,10 @@ module hart
                       (dmem_byte_addr[1:0] == 2'b01) ? dcache_rdata[23:8] :
                       (dmem_byte_addr[1:0] == 2'b10) ? dcache_rdata[31:16] :
                       16'b0;
-
-
+    
+    // this should really be moved down to WB stage
     assign writeback_data =
+                           ex_mem_rd_sel[4] ? ex_mem_fpu_int_res :
                            ex_mem_rd_sel[3] ?
                            (
                             ex_mem_memw ? dcache_rdata :
@@ -930,7 +1104,7 @@ module hart
 	reg [31:0] mem_wb_rs2_data;
 	
 	reg [4:0]  mem_wb_rd;
-	reg [3:0]  mem_wb_rd_sel;
+	reg [4:0]  mem_wb_rd_sel;
 	
 	reg [31:0] mem_wb_dmem_addr;
 	reg [3:0]  mem_wb_dmem_mask;
@@ -942,28 +1116,50 @@ module hart
 	reg        mem_wb_legal;
 	reg        mem_wb_halt;
 	reg        mem_wb_trap;
+
+    reg [ 4:0] mem_wb_fpu_fflags;
+    reg [31:0] mem_wb_fpu_fp_res;
+    reg        mem_wb_frd_en;
+    reg [4:0]  mem_wb_frd;
+
+    reg [4:0]  mem_wb_frs1;
+    reg [31:0] mem_wb_frs1_data;
+    reg [4:0]  mem_wb_frs2;
+    reg [31:0] mem_wb_frs2_data;
+    reg [4:0]  mem_wb_frs3;
+    reg [31:0] mem_wb_frs3_data;
 	
     always @(posedge i_clk) begin
         if (i_rst) begin
             mem_wb_writeback_data <= 32'b0;
             mem_wb_pc             <= 32'b0;
-			mem_wb_next_pc      <= 32'b0;
-			mem_wb_inst         <= 32'b0;
-			mem_wb_rs1          <= 5'd0;
-			mem_wb_rs2          <= 5'd0;
-			mem_wb_rs1_data     <= 32'b0;
-			mem_wb_rs2_data     <= 32'b0;
+			mem_wb_next_pc        <= 32'b0;
+			mem_wb_inst           <= 32'b0;
+			mem_wb_rs1            <= 5'd0;
+			mem_wb_rs2            <= 5'd0;
+			mem_wb_rs1_data       <= 32'b0;
+			mem_wb_rs2_data       <= 32'b0;
             mem_wb_rd             <= 5'd0;
-            mem_wb_rd_sel         <= 4'b0;
-			mem_wb_dmem_addr    <= 32'b0;
-			mem_wb_dmem_mask    <= 4'b0;
-			mem_wb_dmem_ren     <= 1'b0;
-			mem_wb_dmem_wen     <= 1'b0;
-			mem_wb_dmem_rdata   <= 32'b0;
-			mem_wb_dmem_wdata   <= 32'b0;
+            mem_wb_rd_sel         <= 5'b0;
+			mem_wb_dmem_addr      <= 32'b0;
+			mem_wb_dmem_mask      <= 4'b0;
+			mem_wb_dmem_ren       <= 1'b0;
+			mem_wb_dmem_wen       <= 1'b0;
+			mem_wb_dmem_rdata     <= 32'b0;
+			mem_wb_dmem_wdata     <= 32'b0;
             mem_wb_legal          <= 1'b0;
             mem_wb_halt           <= 1'b0;
             mem_wb_trap           <= 1'b0;
+            
+            mem_wb_fpu_fflags     <= 5'b0;
+            mem_ex_fpu_fp_res     <= 32'b0;
+
+            mem_wb_frs1        <= 5'b0;
+            mem_wb_frs1_data   <= 32'b0;
+            mem_wb_frs2        <= 5'b0;
+            mem_wb_frs2_data   <= 32'b0;
+            mem_wb_frs3        <= 5'b0;
+            mem_wb_frs3_data   <= 32'b0;
 		end else if (cache_hold) begin
             // Hold all MEM/WB registers while the cache is waiting.
         end else begin
@@ -986,9 +1182,22 @@ module hart
             mem_wb_legal          <= ex_mem_legal;
             mem_wb_halt           <= ex_mem_halt;
             mem_wb_trap           <= ex_mem_trap || dmem_misaligned;
-        end
-    end
+            
+            mem_wb_fpu_fflags     <= ex_mem_fpu_fflags;
+            mem_wb_fpu_fp_res     <= ex_mem_fpu_fp_res;
+            mem_wb_frd_en         <= ex_mem_frd_en;
+            mem_wb_frd            <= ex_mem_frd;
+            
+            mem_wb_frs1        <= ex_mem_frs1;
+            mem_wb_frs1_data   <= ex_mem_frs1_data;
+            mem_wb_frs2        <= ex_mem_frs2;
+            mem_wb_frs2_data   <= ex_mem_frs2_data;
+            mem_wb_frs3        <= ex_mem_frs2;
+            mem_wb_frs3_data   <= ex_mem_frs2_data;
+        end // else: !if(cache_hold)
+    end // always @ (posedge i_clk)
 
+    // retire interface
     assign o_retire_valid = mem_wb_legal && !cache_hold;
       
     assign o_retire_trap = mem_wb_trap;
@@ -1017,6 +1226,19 @@ module hart
 
 	assign o_retire_pc         = mem_wb_pc;
     
+    // fpu retires
+    assign o_retire_frs1_raddr = mem_wb_frs1;
+    assign o_retire_frs1_rdata = mem_wb_frs1_data;
+    assign o_retire_frs2_raddr = mem_wb_frs2;
+    assign o_retire_frs2_rdata = mem_wb_frs2_data;
+    assign o_retire_frs3_raddr = mem_wb_frs3;
+    assign o_retire_frs3_rdata = mem_wb_frs3_data;
+    
+    assign o_retire_frd_wen = mem_wb_frd_en;
+    assign o_retire_frd_waddr = mem_wb_frd;
+    assign o_retire_frd_wdata = mem_wb_fpu_fp_res;
+    assign o_retire_fflags     = mem_wb_fpu_fflags;
+    
 endmodule // hart
 
-`default_nettype wire
+`default_nettype none

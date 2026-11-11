@@ -27,11 +27,13 @@
 ** TODO [#A] lint after all changes
 * NEXT hart.v                                              :aj:brandon:logan:
 ** DONE [#A] copy/merge over portlist
-** NEXT [#A] implement FP reg paths
-** NEXT [#A] instantiate the FPU module
+** DONE [#A] implement FP reg paths
+*** TODO in writeback data, implement switching for fpu isntrs
+** NEXT [#A] FP memory ops
+** DONE [#A] instantiate the FPU module
 ** NEXT [#B] implement FP hazards
-** WAITING [#B] multi-cycle stalls
-** TODO [#A] implement new retire ports
+** TODO [#B] multi-cycle stalls
+** INPROG [#A] implement new retire ports
 ** OPTIONAL: refactor hart to be cleaner and more readable
 ideas:
 move complex logic to their own modules
