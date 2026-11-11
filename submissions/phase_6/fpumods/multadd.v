@@ -113,29 +113,51 @@ module fpu_multadd (
     wire signed [9:0] b_exp;
     wire signed [9:0] c_exp;
 
-    assign a_sig = (a_reg[30:23] == 8'd0)
-                 ? {1'b0, a_reg[22:0]}
-                 : {1'b1, a_reg[22:0]};
+    function [33:0] unpack_finite;
+        input [31:0] value;
+        reg [23:0] significand;
+        reg signed [9:0] exponent;
+        reg found;
+        integer lead;
+        integer bit_index;
+        integer shift_count;
+        begin
+            if (value[30:23] != 0) begin
+                significand = {1'b1, value[22:0]};
+                exponent = $signed({2'b00, value[30:23]}) - 10'sd127;
+            end else begin
+                significand = {1'b0, value[22:0]};
+                exponent = -10'sd126;
+                found = 1'b0;
+                lead = 0;
+                for (bit_index = 22; bit_index >= 0; bit_index = bit_index - 1) begin
+                    if (value[bit_index] && !found) begin
+                        lead = bit_index;
+                        found = 1'b1;
+                    end
+                end
+                if (found) begin
+                    shift_count = 23 - lead;
+                    for (bit_index = 0; bit_index < 23; bit_index = bit_index + 1) begin
+                        if (bit_index < shift_count)
+                            significand = significand << 1;
+                    end
+                    exponent = exponent - shift_count;
+                end
+            end
+            unpack_finite = {exponent, significand};
+        end
+    endfunction
 
-    assign b_sig = (b_reg[30:23] == 8'd0)
-                 ? {1'b0, b_reg[22:0]}
-                 : {1'b1, b_reg[22:0]};
-
-    assign c_sig = (c_reg[30:23] == 8'd0)
-                 ? {1'b0, c_reg[22:0]}
-                 : {1'b1, c_reg[22:0]};
-
-    assign a_exp = (a_reg[30:23] == 8'd0)
-                 ? -10'sd126
-                 : $signed({2'b00, a_reg[30:23]}) - 10'sd127;
-
-    assign b_exp = (b_reg[30:23] == 8'd0)
-                 ? -10'sd126
-                 : $signed({2'b00, b_reg[30:23]}) - 10'sd127;
-
-    assign c_exp = (c_reg[30:23] == 8'd0)
-                 ? -10'sd126
-                 : $signed({2'b00, c_reg[30:23]}) - 10'sd127;
+    wire [33:0] a_unpacked = unpack_finite(a_reg);
+    wire [33:0] b_unpacked = unpack_finite(b_reg);
+    wire [33:0] c_unpacked = unpack_finite(c_reg);
+    assign a_sig = a_unpacked[23:0];
+    assign b_sig = b_unpacked[23:0];
+    assign c_sig = c_unpacked[23:0];
+    assign a_exp = $signed(a_unpacked[33:24]);
+    assign b_exp = $signed(b_unpacked[33:24]);
+    assign c_exp = $signed(c_unpacked[33:24]);
 
     // ------------------------------------------------------------
     // Iterative multiplier

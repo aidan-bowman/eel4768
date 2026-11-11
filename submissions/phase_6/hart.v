@@ -335,7 +335,7 @@ module hart
 
                      .o_rd_sel(rd_sel),
 
-                     .o_pc_sel(pc_alu_sel)
+                     .o_pc_sel(pc_alu_sel),
 
                      .o_mext(mext),
                      .o_fpu(fpu_en),
@@ -345,7 +345,7 @@ module hart
                      .o_frs3_en(frs3_en),
 
                      .o_rs3(rs3),
-                     .o_frd_en(frd_en),
+                     .o_frd_en(frd_en)
                      );
 
     // ================================================================
@@ -821,6 +821,7 @@ module hart
     reg [31:0] ex_mem_frs2_data;
     reg [4:0]  ex_mem_frs3;
     reg [31:0] ex_mem_frs3_data;
+    reg        ex_mem_frs2_en;
 
 
     always @(posedge i_clk) begin
@@ -860,6 +861,7 @@ module hart
             ex_mem_frs2_data   <= 32'b0;
             ex_mem_frs3        <= 5'b0;
             ex_mem_frs3_data   <= 32'b0;
+            ex_mem_frs2_en     <= 1'b0;
 		end else if (cache_hold) begin
         	// Hold all EX/MEM registers while the cache is waiting.
         end else begin
@@ -899,6 +901,7 @@ module hart
             ex_mem_frs2_data   <= id_ex_frs2_data;
             ex_mem_frs3        <= id_ex_frs3;
             ex_mem_frs3_data   <= id_ex_frs3_data;
+            ex_mem_frs2_en     <= id_ex_frs2_en;
         end // else: !if(cache_hold)
     end // always @ (posedge i_clk)
 
@@ -1161,7 +1164,7 @@ module hart
             mem_wb_trap           <= 1'b0;
             
             mem_wb_fpu_fflags     <= 5'b0;
-            mem_ex_fp_rdata       <= 32'b0;
+            mem_wb_fp_rdata       <= 32'b0;
 
             mem_wb_frs1           <= 5'b0;
             mem_wb_frs1_data      <= 32'b0;

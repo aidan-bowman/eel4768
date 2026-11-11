@@ -359,15 +359,9 @@ module cache_controller
             for (meta_index = 0;
                  meta_index < CACHE_SIZE*1024/BLOCK_SIZE;
                  meta_index = meta_index + 1) begin
-<<<<<<< HEAD
                 tag[meta_index] <= {TAG_WIDTH{1'b0}};
                 valid[meta_index] <= 1'b0;
                 dirty[meta_index] <= 1'b0;
-=======
-                tag[meta_index]     <= {TAG_WIDTH{1'b0}};
-                valid[meta_index]   <= 1'b0;
-                dirty[meta_index]   <= 1'b0;
->>>>>>> 3082368 (fix cache FINAL COMMIT)
                 lru_age[meta_index] <= {WAY_WIDTH{1'b0}};
             end
         end else begin // if (i_rst)
