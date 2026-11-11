@@ -81,12 +81,12 @@ module decoder (
                 //       fclass.s, feq/flt/fle.s, fcvt.w[u].s, and the old CSR value
                 //       for the CSR instructions.
                 output wire [ 4:0] o_rd_sel,
-                // Asserted for the RV32M instructions (OP opcode, funct7 = 0000001).
+                // Asserted for the RV32M instructions (OP opcode, func7 = 0000001).
                 // The ALU then performs the multiply/divide operation selected by
-                // `o_alu_opsel` (the instruction's funct3).
+                // `o_alu_opsel` (the instruction's func3).
                 output wire        o_mext,
                 // F extension. The floating-point unit decodes the details of its own
-                // instructions (funct7, rs2, rm) from the instruction word; the decoder
+                // instructions (func7, rs2, rm) from the instruction word; the decoder
                 // only reports legality and which register file each operand uses.
                 //
                 // Asserted for instructions executed by the floating-point unit: every
@@ -165,55 +165,55 @@ module decoder (
     wire       valid_branch    = ~((func3 == 3'b010) | (func3 == 3'b011));
 
 
-    wire       valid_rm        = (funct3 != 3'b101) &&
-               (funct3 != 3'b110);
+    wire       valid_rm        = (func3 != 3'b101) &&
+               (func3 != 3'b110);
     
     wire       valid_op_fp     = 
                               // fadd.s, fsub.s, fmul.s, fdiv.s
-               (((funct7 == 7'b0000000) ||
-                 (funct7 == 7'b0000100) ||
-                 (funct7 == 7'b0001000) ||
-                 (funct7 == 7'b0001100)) && valid_rm) |
+               (((func7 == 7'b0000000) ||
+                 (func7 == 7'b0000100) ||
+                 (func7 == 7'b0001000) ||
+                 (func7 == 7'b0001100)) && valid_rm) |
                               // fsqrt.s
-               ((funct7 == 7'b0101100) &&
+               ((func7 == 7'b0101100) &&
                 (rs2_field == 5'b00000) && valid_rm) |
                               // fsgnj.s, fsgnjn.s, fsgnjx.s
-               ((funct7 == 7'b0010000) &&
-                (funct3 <= 3'b010)) |
+               ((func7 == 7'b0010000) &&
+                (func3 <= 3'b010)) |
                               // fmin.s, fmax.s
-               ((funct7 == 7'b0010100) &&
-                (funct3 <= 3'b001)) |
+               ((func7 == 7'b0010100) &&
+                (func3 <= 3'b001)) |
                               // fle.s, flt.s, feq.s
-               ((funct7 == 7'b1010000) &&
-                (funct3 <= 3'b010)) |
+               ((func7 == 7'b1010000) &&
+                (func3 <= 3'b010)) |
                               // fclass.s
-               ((funct7 == 7'b1110000) &&
-                (funct3 == 3'b001) &&
+               ((func7 == 7'b1110000) &&
+                (func3 == 3'b001) &&
                 (rs2_field == 5'b00000)) |
                               // fmv.x.w
-               ((funct7 == 7'b1110000) &&
-                (funct3 == 3'b000) &&
+               ((func7 == 7'b1110000) &&
+                (func3 == 3'b000) &&
                 (rs2_field == 5'b00000)) |
                               // fcvt.w.s, fcvt.wu.s
-               ((funct7 == 7'b1100000) &&
+               ((func7 == 7'b1100000) &&
                 ((rs2_field == 5'b00000) ||
                  (rs2_field == 5'b00001)) && valid_rm) |
                               // fcvt.s.w, fcvt.s.wu
-               ((funct7 == 7'b1101000) &&
+               ((func7 == 7'b1101000) &&
                 ((rs2_field == 5'b00000) ||
                  (rs2_field == 5'b00001)) && valid_rm) |
                               // fmv.w.x
-               ((funct7 == 7'b1111000) &&
+               ((func7 == 7'b1111000) &&
                 (rs2_field == 5'b00000) &&
-                (funct3 == 3'b000));
+                (func3 == 3'b000));
     
     wire       valid_fused     = (i_inst[26:25] == 2'b00);
-    wire       valid_load_fp   = (funct3 == 3'b010);
-    wire       valid_store_fp  = (funct3 == 3'b010);
+    wire       valid_load_fp   = (func3 == 3'b010);
+    wire       valid_store_fp  = (func3 == 3'b010);
 
     wire       is_csr          = is_system &&
-               (funct3 != 3'b000) &&
-               (funct3 != 3'b100);
+               (func3 != 3'b000) &&
+               (func3 != 3'b100);
 
     wire       valid_csr       = 
                (i_inst[31:20] == 12'h001) ||
@@ -233,7 +233,7 @@ module decoder (
                      (is_store & valid_store) |
                      (is_branch & valid_branch) |
                      is_jal |
-                     (is_jalr & (funct3 == 3'b000)) |
+                     (is_jalr & (func3 == 3'b000)) |
                      (is_load_fp & valid_load_fp) |
                      (is_store_fp & valid_store_fp) |
                      (is_op_fp & valid_op_fp) |
@@ -255,8 +255,8 @@ module decoder (
                    is_store_fp)
       ? i_inst[19:15] :
                   (is_op_fp &&
-                   ((funct7 == 7'b1101000) ||
-                    (funct7 == 7'b1111000)))
+                   ((func7 == 7'b1101000) ||
+                    (func7 == 7'b1111000)))
         ? i_inst[19:15] :
                   (is_csr && !i_inst[14])
           ? i_inst[19:15] :
@@ -275,7 +275,7 @@ module decoder (
 
     assign o_op1_sel      = is_auipc | is_jal;
     assign o_op2_sel      = ~(is_arr | is_branch);
-    assign o_alu_opsel    = (is_arr | is_arr_imm | is_branch) ? func3 : 3'b000; // funct3 if we're arithmetic or branch, or addition for other ops
+    assign o_alu_opsel    = (is_arr | is_arr_imm | is_branch) ? func3 : 3'b000; // func3 if we're arithmetic or branch, or addition for other ops
     assign o_alu_sub      = is_arr & (func3 == 3'b000) & i_inst[30];
     assign o_alu_unsigned = ((is_arr | is_arr_imm) & (func3 == 3'b011)) | (is_branch & i_inst[13]);
     assign o_alu_arith    = (is_arr | is_arr_imm) & (func3 == 3'b101) & i_inst[30]; // ditto
@@ -309,31 +309,31 @@ module decoder (
     // FP register source classification
     wire fp_rs1_used =
          is_op_fp &&
-         (funct7 != 7'b1101000) &&
-         (funct7 != 7'b1111000);
+         (func7 != 7'b1101000) &&
+         (func7 != 7'b1111000);
 
     wire fp_rs2_used =
          is_op_fp &&
-         ((funct7 == 7'b0000000) ||
-          (funct7 == 7'b0000100) ||
-          (funct7 == 7'b0001000) ||
-          (funct7 == 7'b0001100) ||
-          (funct7 == 7'b0010000) ||
-          (funct7 == 7'b0010100) ||
-          (funct7 == 7'b1010000));
+         ((func7 == 7'b0000000) ||
+          (func7 == 7'b0000100) ||
+          (func7 == 7'b0001000) ||
+          (func7 == 7'b0001100) ||
+          (func7 == 7'b0010000) ||
+          (func7 == 7'b0010100) ||
+          (func7 == 7'b1010000));
 
     wire fp_rd_used =
          is_load_fp ||
          (is_op_fp &&
-          (funct7 != 7'b1010000) &&
-          (funct7 != 7'b1110000) &&
-          (funct7 != 7'b1100000));
+          (func7 != 7'b1010000) &&
+          (func7 != 7'b1110000) &&
+          (func7 != 7'b1100000));
 
     wire int_fp_result =
          is_op_fp &&
-         (((funct7 == 7'b1010000)) ||
-          ((funct7 == 7'b1110000)) ||
-          ((funct7 == 7'b1100000)));
+         (((func7 == 7'b1010000)) ||
+          ((func7 == 7'b1110000)) ||
+          ((func7 == 7'b1100000)));
 
     assign o_fpu = is_op_fp | is_fused | valid_system;
 
