@@ -43,21 +43,16 @@ move complex logic to their own modules
 ** WAITING [#B] lint after all changes
 * NEXT fpu.v                                               :aj:brandon:logan:
 ** DONE copy over skeleton
-** INPROG [#A] instruction decoding
-** NEXT [#A] FP move and compare ops
-** NEXT [#A] FP and integer conversion ops
+** DONE [#A] instruction decoding
+** DONE [#A] FP move and compare ops
+** DONE [#A] FP and integer conversion ops
 ** DONE [#A] FP compare ops
-** NEXT [#B] FP multiplier-adder (own module)
-written, but needs updating
-- [ ] we need to round inside this module. no more 38-bit output pls
-- [ ] use input classification masks! would greatly reduce module complexity
-- [X] probably rename fpa, b, c to rs1, 2, 3
-- [ ] shorten the header
-** NEXT [#B] fused arithmetic ops
-** NEXT [#A] FP division (DO AS OWN SUBMODULE)
-** NEXT [#B] FP square-root (DO AS OWN SUBMODULE)
-** TODO [#C] CSR instructions
-** TODO [#C] mixed instructions
+** DONE [#B] FP multiplier-adder with external rounding
+** DONE [#B] fused arithmetic ops
+** DONE [#A] FP division (DO AS OWN SUBMODULE)
+** DONE [#B] FP square-root (DO AS OWN SUBMODULE)
+** DONE [#C] CSR instructions
+** DONE [#C] mixed instructions
 ** WAITING [#A] lint after all changes
 * cache.v
 this module shouldn't have to be touched. it's not modified in phase_6.
@@ -79,7 +74,7 @@ DEADLINE: <2026-11-07 Sat>
 ** TODO [#B] create testbenches for submodules
 since the TB just checks if memory looks as expected at end of program,
 it'd probably be best to generate testbenches for submodules that might cause errors
-*** TODO make TB for fpu.v
+*** DONE make TB for fpu.v
 *** TODO make TB for rf.v
 *** TODO make TB for multiplier.v
 ** WAITING [#A] run linter on all files BEFORE SUBMITTING
