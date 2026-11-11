@@ -21,8 +21,8 @@ module hart_tb;
     parameter DMEM_WORDS = 32768;
 
     // File paths are relative to the simulator's working directory.
-    parameter IMEM_FILE = "traces/random_program.hex";
-    parameter DMEM_FILE = "traces/random_dmem.hex";
+    parameter IMEM_FILE = "random_program.hex";
+    parameter DMEM_FILE = "random_dmem.hex";
 
     // Simulation controls.
     parameter MAX_CYCLES       = 10000000;
