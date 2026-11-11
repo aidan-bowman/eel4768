@@ -390,7 +390,7 @@ module hart
 
                .i_frd_wen(mem_wb_frd_en),
                .i_frd_waddr(mem_wb_frd),
-               .i_frd_wdata(mem_wb_fpu_fp_res),
+               .i_frd_wdata(mem_wb_fp_rdata),
 
                .i_rd_waddr(rf_rd_waddr),
                .i_rd_wdata(mem_wb_writeback_data)
@@ -754,11 +754,11 @@ module hart
     // FPU
     // ================================================================
 
-    wire fpu_busy; // used for cache_hold
-    wire fpu_fp_res;
-    wire fpu_int_res;
-    wire fpu_fflags;
-    wire fpu_rm_trap;
+    wire        fpu_busy; // used for cache_hold
+    wire [31:0] fpu_fp_res;
+    wire [31:0] fpu_int_res;
+    wire [ 4:0] fpu_fflags;
+    wire        fpu_rm_trap;
 
     fpu fpu (
              .i_clk(i_clk),
@@ -809,7 +809,7 @@ module hart
     reg        ex_mem_halt;
     reg        ex_mem_trap;
 
-    reg [31:0] ex_mem_fpu_fp_res;
+    reg [31:0] ex_mem_fp_rdata;
     reg [31:0] ex_mem_fpu_int_res;
     reg [ 4:0] ex_mem_fpu_fflags;
     reg        ex_mem_frd_en;
@@ -847,7 +847,7 @@ module hart
             ex_mem_halt        <= 1'b0;
             ex_mem_trap        <= 1'b0;
             
-            ex_mem_fpu_fp_res  <= 32'b0;
+            ex_mem_fp_rdata  <= 32'b0;
             ex_mem_fpu_int_res <= 32'b0;
             ex_mem_fpu_fflags  <= 5'b0;
             
@@ -886,7 +886,7 @@ module hart
             ex_mem_halt        <= id_ex_halt;
             ex_mem_trap        <= id_ex_trap || fpu_rm_trap;
             
-            ex_mem_fpu_fp_res  <= fpu_fp_res;
+            ex_mem_fp_rdata    <= fpu_fp_res;
             ex_mem_fpu_int_res <= fpu_int_res;
             ex_mem_fpu_fflags  <= fpu_fflags;
             
@@ -897,16 +897,41 @@ module hart
             ex_mem_frs1_data   <= id_ex_frs1_data;
             ex_mem_frs2        <= id_ex_frs2;
             ex_mem_frs2_data   <= id_ex_frs2_data;
-            ex_mem_frs3        <= id_ex_frs2;
-            ex_mem_frs3_data   <= id_ex_frs2_data;
+            ex_mem_frs3        <= id_ex_frs3;
+            ex_mem_frs3_data   <= id_ex_frs3_data;
         end // else: !if(cache_hold)
     end // always @ (posedge i_clk)
 
     // ================================================================
     // STAGE 4: MEMORY
     // ================================================================
-    
+
+    // ------------------------------------------------
+    // Alignment
+    // ------------------------------------------------
+    // decoder's o_dmem_align:
+    //
+    //   00 = byte
+    //   01 = half-word
+    //   10 = word
+    //
+    // For a byte, no alignment bits matter.
+    // For a half-word, bit 0 must be zero.
+    // For a word, bits 1:0 must both be zero.
+
+    wire dmem_misaligned;
+    assign dmem_misaligned = (ex_mem_memread | ex_mem_memwrite) &&
+                             (
+                              (ex_mem_memalign[0] && dmem_byte_addr[0]) ||
+                              (ex_mem_memalign[1] &&
+                               (dmem_byte_addr[1] | dmem_byte_addr[0]))
+                              );
+
+    // TODO: flw
+
+    // ------------------------------------------------
     // MEM->MEM forwarding
+    // ------------------------------------------------
     wire [31:0] mem_forward_rs2_data;
     wire        mem_forward_wb_rs2;
 
@@ -918,7 +943,22 @@ module hart
 
     assign mem_forward_rs2_data = mem_forward_wb_rs2 ? mem_wb_writeback_data :
                                   ex_mem_rs2_data;
+
+    wire [31:0] mem_forward_frs2_data;
+    wire        mem_forward_wb_frs2;
     
+    assign mem_forward_wb_frs2 = FWD_EN &&
+                                 mem_wb_legal &&
+                                 !mem_wb_halt &&
+                                 mem_wb_frd_en &&
+                                 (mem_wb_frd == ex_mem_frs2);
+
+    assign mem_forward_frs2_data = mem_forward_wb_frs2 ? mem_wb_fp_rdata :
+                                   ex_mem_fp_rdata;
+
+    // ------------------------------------------------
+    // dcache
+    // ------------------------------------------------
     wire [31:0] dmem_byte_addr;
     assign dmem_byte_addr = ex_mem_alu_result;
     
@@ -932,42 +972,41 @@ module hart
 
     assign dcache_addr= {dmem_byte_addr[31:2], 2'b00};
 
-    assign dcache_ren =
-                        ex_mem_memread &&
+    assign dcache_ren = ex_mem_memread &&
                         ex_mem_legal &&
                         !ex_mem_halt &&
-                        !dmem_misaligned;
+                        !dmem_misaligned &&
+                        !fpu_busy;
 
-    assign dcache_wen =
-                        ex_mem_memwrite &&
+    assign dcache_wen = ex_mem_memwrite &&
                         ex_mem_legal &&
                         !ex_mem_halt &&
-                        !dmem_misaligned;
+                        !dmem_misaligned &&
+                        !fpu_busy;
 
 	assign cache_hold = icache_stall ||
                     	((dcache_ren || dcache_wen) && dcache_stall) ||
                         fpu_busy; // this should probably be moved elsewhere
 
-    assign dcache_mask =
-                        ex_mem_memw ? 4'b1111 :
-                        ex_mem_memh ? half_mask :
-                        byte_mask;
+    assign dcache_mask = ex_mem_memw ? 4'b1111 :
+                         ex_mem_memh ? half_mask :
+                         byte_mask;
 
-    assign dcache_wdata =
-                         ex_mem_memw ? mem_forward_rs2_data :
-                         ex_mem_memh ?
-                         (
+    assign dcache_wdata = ex_mem_frs2_en ? mem_forward_frs2_data :
+                          ex_mem_memw ? mem_forward_rs2_data :
+                          ex_mem_memh ?
+                          (
                            (dmem_byte_addr[1:0] == 2'b00) ? {16'b0, mem_forward_rs2_data[15:0]} :
                            (dmem_byte_addr[1:0] == 2'b01) ? {8'b0, mem_forward_rs2_data[15:0], 8'b0} :
                            (dmem_byte_addr[1:0] == 2'b10) ? {mem_forward_rs2_data[15:0], 16'b0} :
                            32'b0
-                         ) :
-                         (
+                           ) :
+                          (
                            (dmem_byte_addr[1:0] == 2'b00) ? {24'b0, mem_forward_rs2_data[7:0]} :
                            (dmem_byte_addr[1:0] == 2'b01) ? {16'b0, mem_forward_rs2_data[7:0], 8'b0} :
                            (dmem_byte_addr[1:0] == 2'b10) ? {8'b0, mem_forward_rs2_data[7:0], 16'b0} :
                            {mem_forward_rs2_data[7:0], 24'b0}
-                         );
+                           );
 
     cache #(
         .EVICT_POLICY(EVICT_POLICY),
@@ -997,32 +1036,6 @@ module hart
         .o_mem_wr_be(o_dmem_wr_be)
     );
 
-
-
-    // ------------------------------------------------
-    // Alignment
-    // ------------------------------------------------
-    //
-    // decoder's o_dmem_align:
-    //
-    //   00 = byte
-    //   01 = half-word
-    //   10 = word
-    //
-    // For a byte, no alignment bits matter.
-    // For a half-word, bit 0 must be zero.
-    // For a word, bits 1:0 must both be zero.
-
-    wire dmem_misaligned;
-
-    assign dmem_misaligned =
-                            (ex_mem_memread | ex_mem_memwrite) &&
-                            (
-                             (ex_mem_memalign[0] && dmem_byte_addr[0]) ||
-                             (ex_mem_memalign[1] &&
-                              (dmem_byte_addr[1] | dmem_byte_addr[0]))
-                             );
-
     // ------------------------------------------------
     // Memory mask
     // ------------------------------------------------
@@ -1030,17 +1043,15 @@ module hart
     wire [3:0] byte_mask;
     wire [3:0] half_mask;
 
-    assign byte_mask =
-                      (dmem_byte_addr[1:0] == 2'b00) ? 4'b0001 :
-                      (dmem_byte_addr[1:0] == 2'b01) ? 4'b0010 :
-                      (dmem_byte_addr[1:0] == 2'b10) ? 4'b0100 :
-                      4'b1000;
+    assign byte_mask = (dmem_byte_addr[1:0] == 2'b00) ? 4'b0001 :
+                       (dmem_byte_addr[1:0] == 2'b01) ? 4'b0010 :
+                       (dmem_byte_addr[1:0] == 2'b10) ? 4'b0100 :
+                       4'b1000;
 
-    assign half_mask =
-                      (dmem_byte_addr[1:0] == 2'b00) ? 4'b0011 :
-                      (dmem_byte_addr[1:0] == 2'b01) ? 4'b0110 :
-                      (dmem_byte_addr[1:0] == 2'b10) ? 4'b1100 :
-                      4'b0000;
+    assign half_mask = (dmem_byte_addr[1:0] == 2'b00) ? 4'b0011 :
+                       (dmem_byte_addr[1:0] == 2'b01) ? 4'b0110 :
+                       (dmem_byte_addr[1:0] == 2'b10) ? 4'b1100 :
+                       4'b0000;
 
     // ------------------------------------------------
     // Store data
@@ -1053,19 +1064,17 @@ module hart
     wire [7:0] load_byte;
     wire [15:0] load_half;
 
-    assign load_byte =
-                      (dmem_byte_addr[1:0] == 2'b00) ? dcache_rdata[7:0] :
-                      (dmem_byte_addr[1:0] == 2'b01) ? dcache_rdata[15:8] :
-                      (dmem_byte_addr[1:0] == 2'b10) ? dcache_rdata[23:16] :
-                      dcache_rdata[31:24];
+    assign load_byte = (dmem_byte_addr[1:0] == 2'b00) ? dcache_rdata[7:0] :
+                       (dmem_byte_addr[1:0] == 2'b01) ? dcache_rdata[15:8] :
+                       (dmem_byte_addr[1:0] == 2'b10) ? dcache_rdata[23:16] :
+                       dcache_rdata[31:24];
 
-    assign load_half =
-                      (dmem_byte_addr[1:0] == 2'b00) ? dcache_rdata[15:0] :
-                      (dmem_byte_addr[1:0] == 2'b01) ? dcache_rdata[23:8] :
-                      (dmem_byte_addr[1:0] == 2'b10) ? dcache_rdata[31:16] :
-                      16'b0;
-    
-    // this should really be moved down to WB stage
+    assign load_half = (dmem_byte_addr[1:0] == 2'b00) ? dcache_rdata[15:0] :
+                       (dmem_byte_addr[1:0] == 2'b01) ? dcache_rdata[23:8] :
+                       (dmem_byte_addr[1:0] == 2'b10) ? dcache_rdata[31:16] :
+                       16'b0;
+
+    // TODO: move into WB phase
     assign writeback_data =
                            ex_mem_rd_sel[4] ? ex_mem_fpu_int_res :
                            ex_mem_rd_sel[3] ?
@@ -1118,7 +1127,7 @@ module hart
 	reg        mem_wb_trap;
 
     reg [ 4:0] mem_wb_fpu_fflags;
-    reg [31:0] mem_wb_fpu_fp_res;
+    reg [31:0] mem_wb_fp_rdata;
     reg        mem_wb_frd_en;
     reg [4:0]  mem_wb_frd;
 
@@ -1152,14 +1161,14 @@ module hart
             mem_wb_trap           <= 1'b0;
             
             mem_wb_fpu_fflags     <= 5'b0;
-            mem_ex_fpu_fp_res     <= 32'b0;
+            mem_ex_fp_rdata       <= 32'b0;
 
-            mem_wb_frs1        <= 5'b0;
-            mem_wb_frs1_data   <= 32'b0;
-            mem_wb_frs2        <= 5'b0;
-            mem_wb_frs2_data   <= 32'b0;
-            mem_wb_frs3        <= 5'b0;
-            mem_wb_frs3_data   <= 32'b0;
+            mem_wb_frs1           <= 5'b0;
+            mem_wb_frs1_data      <= 32'b0;
+            mem_wb_frs2           <= 5'b0;
+            mem_wb_frs2_data      <= 32'b0;
+            mem_wb_frs3           <= 5'b0;
+            mem_wb_frs3_data      <= 32'b0;
 		end else if (cache_hold) begin
             // Hold all MEM/WB registers while the cache is waiting.
         end else begin
@@ -1184,16 +1193,16 @@ module hart
             mem_wb_trap           <= ex_mem_trap || dmem_misaligned;
             
             mem_wb_fpu_fflags     <= ex_mem_fpu_fflags;
-            mem_wb_fpu_fp_res     <= ex_mem_fpu_fp_res;
+            mem_wb_fp_rdata       <= ex_mem_memread ? ex_mem_fp_rdata : dcache_rdata;
             mem_wb_frd_en         <= ex_mem_frd_en;
             mem_wb_frd            <= ex_mem_frd;
             
-            mem_wb_frs1        <= ex_mem_frs1;
-            mem_wb_frs1_data   <= ex_mem_frs1_data;
-            mem_wb_frs2        <= ex_mem_frs2;
-            mem_wb_frs2_data   <= ex_mem_frs2_data;
-            mem_wb_frs3        <= ex_mem_frs2;
-            mem_wb_frs3_data   <= ex_mem_frs2_data;
+            mem_wb_frs1           <= ex_mem_frs1;
+            mem_wb_frs1_data      <= ex_mem_frs1_data;
+            mem_wb_frs2           <= ex_mem_frs2;
+            mem_wb_frs2_data      <= ex_mem_frs2_data;
+            mem_wb_frs3           <= ex_mem_frs3;
+            mem_wb_frs3_data      <= ex_mem_frs3_data;
         end // else: !if(cache_hold)
     end // always @ (posedge i_clk)
 
@@ -1236,7 +1245,7 @@ module hart
     
     assign o_retire_frd_wen = mem_wb_frd_en;
     assign o_retire_frd_waddr = mem_wb_frd;
-    assign o_retire_frd_wdata = mem_wb_fpu_fp_res;
+    assign o_retire_frd_wdata = mem_wb_fp_rdata;
     assign o_retire_fflags     = mem_wb_fpu_fflags;
     
 endmodule // hart

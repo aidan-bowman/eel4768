@@ -29,7 +29,7 @@
 ** DONE [#A] copy/merge over portlist
 ** DONE [#A] implement FP reg paths
 *** TODO in writeback data, implement switching for fpu isntrs
-** NEXT [#A] FP memory ops
+** DONE [#A] FP memory ops
 ** DONE [#A] instantiate the FPU module
 ** NEXT [#B] implement FP hazards
 ** TODO [#B] multi-cycle stalls
