@@ -30,7 +30,7 @@ module alu (
     // 3'b101: divu   - unsigned op1 / op2
     // 3'b110: rem    - signed remainder, same sign as op1
     // 3'b111: remu   - unsigned remainder
-    input  wire [ 2:0] i_opsel,
+    input  wire [2:0] i_opsel,
     // When asserted, addition operations should subtract instead.
     // This is only used for `i_opsel == 3'b000` (addition/subtraction).
     input  wire        i_sub,
@@ -672,7 +672,7 @@ module alu (
 	assign mul_a_signed = (i_opsel == 3'b001) ||
 						  (i_opsel == 3'b010);
 
-	assign mul_a_signed = (i_opsel == 3'b001);
+	assign mul_b_signed = (i_opsel == 3'b001);
 
 	multiplier mul_unit (
         .i_clk         (i_clk),
@@ -690,7 +690,7 @@ module alu (
 	// Capture the completed result and hold it until the instruction advances.
 	always @(posedge i_clk) begin
 		if (i_rst) begin
-			mul_start	<= 1'b0;
+			mul_started	<= 1'b0;
 			mul_valid	<= 1'b0;
 			mul_result	<= 32'b0;
 		end
