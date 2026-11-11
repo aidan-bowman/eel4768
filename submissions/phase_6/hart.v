@@ -239,9 +239,6 @@ module hart
     wire legal;
     wire halt;
     
-    wire trap;
-    assign trap = !legal;
-
     wire        id_nop; // see hazardctrl
 
     wire [4:0] rs1;
