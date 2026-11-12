@@ -143,11 +143,11 @@ module fpu_tb;
         frs1 = 32'hbf800000; // -1.0
         frs2 = 32'h40000000; // +2.0
         opfp(7'b0010000, 5'd2, 3'b000);
-        check32("fsgnj.s", fp_result, 32'hc0000000);
+        check32("fsgnj rs1 mag, rs2 sign", fp_result, 32'h3f800000);
         opfp(7'b0010000, 5'd2, 3'b001);
-        check32("fsgnjn.s", fp_result, 32'h40000000);
+        check32("fsgnjn rs1 mag, inverted rs2", fp_result, 32'hbf800000);
         opfp(7'b0010000, 5'd2, 3'b010);
-        check32("fsgnjx.s", fp_result, 32'hc0000000);
+        check32("fsgnjx rs1 mag, xor sign", fp_result, 32'hbf800000);
 
         // Min/max, including signed zero and one-NaN cases.
         frs1 = 32'hc0000000; // -2.0

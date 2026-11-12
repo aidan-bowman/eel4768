@@ -474,9 +474,11 @@ module fpu (
 
     // Result selection for arithmetic, conversion, comparison, move, and CSR
     // datapaths. Invalid arithmetic cases use the canonical quiet NaN.
-    assign o_fp_result = op[9]  ? {i_frs1[31], i_frs2[30:0]} :
-                         op[10] ? {~i_frs1[31], i_frs2[30:0]} :
-                         op[11] ? {i_frs1[31] ^ i_frs2[31], i_frs2[30:0]} :
+    // Sign-injection instructions always take the magnitude from rs1 and
+    // derive the result sign from the sign bits of rs1 and rs2.
+    assign o_fp_result = op[9]  ? {i_frs2[31], i_frs1[30:0]} :
+                         op[10] ? {~i_frs2[31], i_frs1[30:0]} :
+                         op[11] ? {i_frs1[31] ^ i_frs2[31], i_frs1[30:0]} :
                          (op[12] | op[13]) ? minmax_result :
                          math_op ? (math_special ? math_special_result : math_result) :
                          divsqrt_op ? (divsqrt_special ? divsqrt_special_result : divsqrt_result) :

@@ -661,6 +661,13 @@ module alu (
 	reg 		mul_started;
 	reg 		mul_valid;
 	reg  [31:0]	mul_result;
+	wire        div_start;
+	wire [31:0] div_result;
+	wire        div_busy;
+	wire        div_ready;
+	reg         div_started;
+	reg         div_valid;
+	reg  [31:0] div_result_reg;
 
 	// The first four M-extension operations are multilpication.
 	assign mul_start =  i_mext &&
@@ -687,20 +694,44 @@ module alu (
         .o_ready       (mul_ready)
     );
 
+    // The final four M-extension operations share the iterative divider.
+    assign div_start = i_mext && i_opsel[2] &&
+                       !div_started && !div_valid;
+
+    divider div_unit (
+        .i_clk(i_clk),
+        .i_rst(i_rst),
+        .i_start(div_start),
+        .i_signed((i_opsel == 3'b100) || (i_opsel == 3'b110)),
+        .i_rem(i_opsel[1]),
+        .i_a(i_op1),
+        .i_b(i_op2),
+        .o_result(div_result),
+        .o_busy(div_busy),
+        .o_ready(div_ready)
+    );
+
 	// Capture the completed result and hold it until the instruction advances.
 	always @(posedge i_clk) begin
 		if (i_rst) begin
 			mul_started	<= 1'b0;
 			mul_valid	<= 1'b0;
 			mul_result	<= 32'b0;
+			div_started <= 1'b0;
+			div_valid   <= 1'b0;
+			div_result_reg <= 32'b0;
 		end
 		else if (i_advance) begin
 			mul_started	<= 1'b0;
 			mul_valid	<= 1'b0;
+			div_started <= 1'b0;
+			div_valid   <= 1'b0;
 		end
 		else begin
 			if (mul_start)
 				mul_started	<= 1'b1;
+			if (div_start)
+				div_started <= 1'b1;
 
 			if (mul_ready) begin
 				mul_result	<= (i_opsel == 3'b000) ?
@@ -709,11 +740,16 @@ module alu (
 
 				mul_valid	<=1'b1;
 			end
+			if (div_ready) begin
+				div_result_reg <= div_result;
+				div_valid <= 1'b1;
+			end
 		end
 	end
 
-	// Keep the instruction in EX until its multiplication is complete.
-	assign o_busy = i_mext && !i_opsel[2] && !mul_valid;
+	// Keep the instruction in EX until its M-extension result is complete.
+	assign o_busy = i_mext &&
+				(i_opsel[2] ? !div_valid : !mul_valid);
 
 	
     // ============================================================
@@ -721,7 +757,7 @@ module alu (
     // ============================================================
 
     assign o_result = i_mext ?
-		(i_opsel[2] ? 32'b0 : mul_result) :
+		(i_opsel[2] ? div_result_reg : mul_result) :
 		(i_opsel == 3'b000) ? cla_sum :
         (i_opsel == 3'b001) ? shift_left_result :
         (i_opsel == 3'b010) ? {31'b0, signed_less} :

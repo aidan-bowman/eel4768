@@ -130,32 +130,6 @@ module hart
           );
 
     // ================================================================
-    // HAZARD CONTROL
-    // ================================================================
-    // this module reads signals from throughout the CPU
-    // and gens signals that (ideally) stop hazards from being genned
-    
-    hazardctrl #(
-                 .FWD_EN(FWD_EN),
-                 .BYPASS_EN(BYPASS_EN)
-                 )
-    hazardctrl (
-                .i_id_rs1(rs1), // fill in our wires in parenthesis
-                .i_id_rs2(rs2),
-                .i_id_store(decoder_dmem_ren),
-                .i_ex_rd(id_ex_rd),
-                .i_ex_rs1(id_ex_rs1),
-                .i_ex_rs2(id_ex_rs2),
-                .i_ex_load(id_ex_memwrite),
-                .i_ex_btaken(ex_branchtaken),
-                .i_mem_rd(ex_mem_rd),
-                .i_wb_rd(ex_mem_rd),
-                //outputs
-                .o_if_hold(if_hold),
-                .o_id_nop(id_nop)
-                );
-    
-    // ================================================================
     // STAGE 1: FETCH INSTRUCTION
     // ================================================================
 
@@ -225,7 +199,10 @@ module hart
             // don't update anything
         end else begin
             if_id_pc   <= pc;
-            if_id_inst <= icache_rdata;
+            // Branches resolve in EX and jumps in ID. The instruction fetched
+            // on the old path must be replaced before it reaches ID/EX.
+            if_id_inst <= (ex_branchtaken || jump_taken) ?
+                          32'h00000013 : icache_rdata;
             pc         <= next_pc;
             if_id_nextpc <= next_pc;
         end
@@ -416,6 +393,7 @@ module hart
     reg        id_ex_alu_sub;
     reg        id_ex_alu_unsigned;
     reg        id_ex_alu_arith;
+    reg        id_ex_mext;
 
     reg        id_ex_op1_pc_sel;
     reg        id_ex_op2_imm_sel;
@@ -474,6 +452,7 @@ module hart
             id_ex_alu_sub         <= 1'b0;
             id_ex_alu_unsigned    <= 1'b0;
             id_ex_alu_arith       <= 1'b0;
+            id_ex_mext            <= 1'b0;
             id_ex_op1_pc_sel      <= 1'b0;
             id_ex_op2_imm_sel     <= 1'b0;
             id_ex_branch          <= 1'b0;
@@ -527,6 +506,7 @@ module hart
             id_ex_alu_sub         <= 1'b0;
             id_ex_alu_unsigned    <= 1'b0;
             id_ex_alu_arith       <= 1'b0;
+            id_ex_mext            <= 1'b0;
             id_ex_op1_pc_sel      <= 1'b0;
             id_ex_op2_imm_sel     <= 1'b0;
             id_ex_branch          <= 1'b0;
@@ -578,6 +558,7 @@ module hart
             id_ex_alu_sub         <= alu_sub;
             id_ex_alu_unsigned    <= alu_unsigned;
             id_ex_alu_arith       <= alu_arith;
+            id_ex_mext            <= mext;
             id_ex_op1_pc_sel      <= op1_pc_sel;
             id_ex_op2_imm_sel     <= op2_imm_sel;
             id_ex_branch          <= inst_branch;
@@ -636,6 +617,7 @@ module hart
 	wire [31:0] alu_result;
 	wire        alu_eq;
 	wire        alu_slt;
+    wire        alu_busy;
 
 
 	// EX->EX forwarding
@@ -672,11 +654,11 @@ module hart
 
 	// Forwarding multiplexers
 
-	assign forward_rs1_data = forward_ex_rs1 ? ex_mem_alu_result :
+	assign forward_rs1_data = forward_ex_rs1 ? writeback_data :
     		                  forward_wb_rs1 ? mem_wb_writeback_data :
         		              id_ex_rs1_data;
 
-	assign forward_rs2_data = forward_ex_rs2 ? ex_mem_alu_result :
+	assign forward_rs2_data = forward_ex_rs2 ? writeback_data :
     		                  forward_wb_rs2 ? mem_wb_writeback_data :
     		                  id_ex_rs2_data;
 
@@ -686,17 +668,22 @@ module hart
 
 
     alu alu (
+             .i_clk(i_clk),
+             .i_rst(i_rst),
              .i_opsel(id_ex_alu_opsel),
              .i_sub(id_ex_alu_sub),
              .i_unsigned(id_ex_alu_unsigned),
              .i_arith(id_ex_alu_arith),
+             .i_mext(id_ex_mext && id_ex_legal),
+             .i_advance(~cache_hold),
 
              .i_op1(alu_op1),
              .i_op2(alu_op2),
 
              .o_result(alu_result),
              .o_eq(alu_eq),
-             .o_slt(alu_slt)
+             .o_slt(alu_slt),
+             .o_busy(alu_busy)
              );
 
     // ================================================================
@@ -769,7 +756,7 @@ module hart
              .i_frs1(id_ex_frs1_data),
              .i_frs2(id_ex_frs2_data),
              .i_frs3(id_ex_frs3_data),
-             .i_xrs1(id_ex_rs1_data),
+             .i_xrs1(forward_rs1_data),
              .o_fp_result(fpu_fp_res),
              .o_int_result(fpu_int_res),
              .o_fflags(fpu_fflags),
@@ -957,7 +944,7 @@ module hart
                                  (mem_wb_frd == ex_mem_frs2);
 
     assign mem_forward_frs2_data = mem_forward_wb_frs2 ? mem_wb_fp_rdata :
-                                   ex_mem_fp_rdata;
+                                   ex_mem_frs2_data;
 
     // ------------------------------------------------
     // dcache
@@ -979,17 +966,19 @@ module hart
                         ex_mem_legal &&
                         !ex_mem_halt &&
                         !dmem_misaligned &&
-                        !fpu_busy;
+                        !fpu_busy &&
+                        !alu_busy;
 
     assign dcache_wen = ex_mem_memwrite &&
                         ex_mem_legal &&
                         !ex_mem_halt &&
                         !dmem_misaligned &&
-                        !fpu_busy;
+                        !fpu_busy &&
+                        !alu_busy;
 
-	assign cache_hold = icache_stall ||
+    assign cache_hold = icache_stall ||
                     	((dcache_ren || dcache_wen) && dcache_stall) ||
-                        fpu_busy; // this should probably be moved elsewhere
+                        fpu_busy || alu_busy;
 
     assign dcache_mask = ex_mem_memw ? 4'b1111 :
                          ex_mem_memh ? half_mask :
@@ -1165,6 +1154,8 @@ module hart
             
             mem_wb_fpu_fflags     <= 5'b0;
             mem_wb_fp_rdata       <= 32'b0;
+            mem_wb_frd_en         <= 1'b0;
+            mem_wb_frd            <= 5'b0;
 
             mem_wb_frs1           <= 5'b0;
             mem_wb_frs1_data      <= 32'b0;
@@ -1196,8 +1187,10 @@ module hart
             mem_wb_trap           <= ex_mem_trap || dmem_misaligned;
             
             mem_wb_fpu_fflags     <= ex_mem_fpu_fflags;
-            mem_wb_fp_rdata       <= ex_mem_memread ? ex_mem_fp_rdata : dcache_rdata;
-            mem_wb_frd_en         <= ex_mem_frd_en;
+            mem_wb_fp_rdata       <= ex_mem_memread ? dcache_rdata : ex_mem_fp_rdata;
+            mem_wb_frd_en         <= ex_mem_frd_en && ex_mem_legal &&
+                                     !ex_mem_halt && !ex_mem_trap &&
+                                     !dmem_misaligned;
             mem_wb_frd            <= ex_mem_frd;
             
             mem_wb_frs1           <= ex_mem_frs1;
@@ -1246,10 +1239,44 @@ module hart
     assign o_retire_frs3_raddr = mem_wb_frs3;
     assign o_retire_frs3_rdata = mem_wb_frs3_data;
     
-    assign o_retire_frd_wen = mem_wb_frd_en;
+    assign o_retire_frd_wen = mem_wb_frd_en && mem_wb_legal &&
+                              !mem_wb_halt && !mem_wb_trap;
     assign o_retire_frd_waddr = mem_wb_frd;
     assign o_retire_frd_wdata = mem_wb_fp_rdata;
     assign o_retire_fflags     = mem_wb_fpu_fflags;
+
+    // Keep the hazard-control instance after the pipeline signal declarations
+    // so strict Verilog lint sees every connected signal declared first.
+    hazardctrl #(
+                 .FWD_EN(FWD_EN),
+                 .BYPASS_EN(BYPASS_EN)
+                 )
+    hazardctrl (
+                .i_id_rs1(rs1),
+                .i_id_rs2(rs2),
+                .i_id_store(decoder_dmem_wen),
+                .i_id_frs1(if_id_inst[19:15]),
+                .i_id_frs2(if_id_inst[24:20]),
+                .i_id_frs3(if_id_inst[31:27]),
+                .i_id_frs1_used(frs1_en),
+                .i_id_frs2_used(frs2_en),
+                .i_id_frs3_used(frs3_en),
+                .i_ex_rd(id_ex_rd),
+                .i_ex_rs1(id_ex_rs1),
+                .i_ex_rs2(id_ex_rs2),
+                .i_ex_load(id_ex_memread),
+                .i_ex_btaken(ex_branchtaken),
+                .i_ex_frd(id_ex_frd),
+                .i_ex_frd_en(id_ex_frd_en && id_ex_legal && !id_ex_trap),
+                .i_mem_rd(ex_mem_rd),
+                .i_mem_frd(ex_mem_frd),
+                .i_mem_frd_en(ex_mem_frd_en && ex_mem_legal && !ex_mem_trap),
+                .i_wb_rd(mem_wb_rd),
+                .i_wb_frd(mem_wb_frd),
+                .i_wb_frd_en(mem_wb_frd_en && mem_wb_legal && !mem_wb_trap),
+                .o_if_hold(if_hold),
+                .o_id_nop(id_nop)
+                );
     
 endmodule // hart
 

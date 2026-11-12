@@ -4,11 +4,11 @@
 #+TAGS: aj(a) brandon(b) logan(l)
 
 
-* NEXT alu.v                                                          :logan:
-** NEXT [#A] copy/merge over portlist from course_files
-** NEXT [#A] connect in multiplier module
-** TODO [#A] implement integer division module
-** WAITING [#A] connect mul and div ops to ALU control logic
+* INPROG alu.v                                                          :logan:
+** DONE [#A] copy/merge over portlist from course_files
+** DONE [#A] connect in multiplier module
+** DONE [#A] implement integer division module
+** DONE [#A] connect mul and div ops to ALU control logic
 ** WAITING [#A] lint after all changes
 * DONE multiplier.v                                                      :aj:
 ** DONE [#A] writeup portlist
@@ -24,24 +24,24 @@
 ** DONE [#A] copy/merge over portlist
 ** DONE [#A] registers for 32 FP regs
 ** DONE [#A] control logic for FP regs
-** TODO [#A] lint after all changes
-* NEXT hart.v                                              :aj:brandon:logan:
+** WAITING [#A] lint after all changes
+* INPROG hart.v                                              :aj:brandon:logan:
 ** DONE [#A] copy/merge over portlist
 ** DONE [#A] implement FP reg paths
-*** TODO in writeback data, implement switching for fpu isntrs
+*** DONE in writeback data, implement switching for fpu isntrs
 ** DONE [#A] FP memory ops
 ** DONE [#A] instantiate the FPU module
-** NEXT [#B] implement FP hazards
-** TODO [#B] multi-cycle stalls
-** INPROG [#A] implement new retire ports
+** DONE [#B] implement FP hazards
+** DONE [#B] multi-cycle stalls
+** DONE [#A] implement new retire ports
 ** OPTIONAL: refactor hart to be cleaner and more readable
 ideas:
 move complex logic to their own modules
 ** WAITING [#A] lint after all changes
-* WAITING hzrdctrl.v                                             :aj:brandon:
-** WAITING [#B] implement FP hazards
+* DONE hzrdctrl.v                                             :aj:brandon:
+** DONE [#B] implement FP hazards
 ** WAITING [#B] lint after all changes
-* NEXT fpu.v                                               :aj:brandon:logan:
+* INPROG fpu.v                                               :aj:brandon:logan:
 ** DONE copy over skeleton
 ** DONE [#A] instruction decoding
 ** DONE [#A] FP move and compare ops
@@ -60,23 +60,23 @@ however, if phase_5 comes back with less than a 100%, our module is DISFUNCTIONA
 lint if changed!
 * imm.v
 shouldn't change at all... lint if changed
-* NEXT testing                                                      :brandon:
-** TODO [#A] CREATE NEW TESTBENCH
-this needs to be double-checked as matching expected values BEFORE we need to use it.
-*** NEXT read README.md, phase_6.pdf
+* INPROG testing                                                      :brandon:
+** INPROG [#A] CREATE NEW TESTBENCH
+The testbench runs the program through the final ebreak, but its final data-memory comparison still fails. Investigate the remaining integration and functional mismatches before marking this complete.
+*** INPROG read README.md, phase_6.pdf
 DEADLINE: <2026-11-05 Thu>
-*** NEXT check over traces (random_program.hex is the loaded input, random_dmem.hex is the EXPECTED RAM at the end)
+*** DONE check over traces (random_program.hex is the loaded input, random_dmem.hex is the EXPECTED RAM at the end)
 DEADLINE: <2026-11-05 Thu>
-*** TODO copy over functional TB code
+*** DONE copy over functional TB code
 DEADLINE: <2026-11-05 Thu>
-*** TODO rewrite output to check expected ram
+*** DONE rewrite output to check expected ram
 DEADLINE: <2026-11-07 Sat>
-** TODO [#B] create testbenches for submodules
+** DONE [#B] create testbenches for submodules
 since the TB just checks if memory looks as expected at end of program,
 it'd probably be best to generate testbenches for submodules that might cause errors
 *** DONE make TB for fpu.v
-*** TODO make TB for rf.v
-*** TODO make TB for multiplier.v
+*** DONE make TB for rf.v
+*** DONE make TB for multiplier.v
 ** WAITING [#A] run linter on all files BEFORE SUBMITTING
 * notes
 ** bug tracker

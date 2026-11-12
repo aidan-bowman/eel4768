@@ -17,16 +17,28 @@ module hazardctrl
       input wire [4:0] i_id_rs1,    // potential RAW or Load-Use hazard
       input wire [4:0] i_id_rs2,    // potential RAW or Load-Store hazard
       input wire       i_id_store,  // necessary to see if load->store is happening
+      input wire [4:0] i_id_frs1,
+      input wire [4:0] i_id_frs2,
+      input wire [4:0] i_id_frs3,
+      input wire       i_id_frs1_used,
+      input wire       i_id_frs2_used,
+      input wire       i_id_frs3_used,
      // EX
       input wire [4:0] i_ex_rd,     // W part of RAW
       input wire [4:0] i_ex_rs1,    // destination for forwarding
       input wire [4:0] i_ex_rs2,    // destination for forwarding
       input wire       i_ex_load,   // necessary to see if load->store is happening
       input wire       i_ex_btaken, // true if we TAKE a branch in i_ex (later: implement better prediction)
+      input wire [4:0] i_ex_frd,
+      input wire       i_ex_frd_en,
      // MEM
       input wire [4:0] i_mem_rd,    // W part of RAW
+      input wire [4:0] i_mem_frd,
+      input wire       i_mem_frd_en,
      // WB
       input wire [4:0] i_wb_rd,     // W part of RAW
+      input wire [4:0] i_wb_frd,
+      input wire       i_wb_frd_en,
     
      // OUTPUTS:
      // IF
@@ -40,7 +52,22 @@ module hazardctrl
     wire mem_match_rs1, mem_match_rs2;
     wire wb_match_rs1, wb_match_rs2;
     wire load_store_hazard;
+    wire integer_stall;
+    wire fp_stall;
     wire stall;
+
+    wire fp_ex_match = i_ex_frd_en &&
+        ((i_id_frs1_used && i_id_frs1 == i_ex_frd) ||
+         (i_id_frs2_used && i_id_frs2 == i_ex_frd) ||
+         (i_id_frs3_used && i_id_frs3 == i_ex_frd));
+    wire fp_mem_match = i_mem_frd_en &&
+        ((i_id_frs1_used && i_id_frs1 == i_mem_frd) ||
+         (i_id_frs2_used && i_id_frs2 == i_mem_frd) ||
+         (i_id_frs3_used && i_id_frs3 == i_mem_frd));
+    wire fp_wb_match = i_wb_frd_en &&
+        ((i_id_frs1_used && i_id_frs1 == i_wb_frd) ||
+         (i_id_frs2_used && i_id_frs2 == i_wb_frd) ||
+         (i_id_frs3_used && i_id_frs3 == i_wb_frd));
 
     // control hazards
     wire flush;
@@ -78,24 +105,29 @@ module hazardctrl
             // we can't forward from a load...
             // UNLESS we're doing load->store where store is storing loaded value
             // (load rd == store rs2)
-            assign stall = i_ex_load & (ex_match_rs1 |
-                                        (ex_match_rs2 & i_id_store));
+            assign integer_stall = i_ex_load & (ex_match_rs1 |
+                                                (ex_match_rs2 & i_id_store));
+            assign fp_stall = fp_ex_match | fp_mem_match;
         end else if (FWD_EN) begin : g_forwarding
             // this should honestly not be a case that happens
             // so let's just "throw an error"
-            assign stall = 1'b1;
+            assign integer_stall = 1'b1;
+            assign fp_stall = 1'b1;
         end else if (BYPASS_EN) begin : g_bypass
             // baseline MINUS wb matches (since we can bypass)
-            assign stall = ex_match_rs1 | ex_match_rs2 |
-                           mem_match_rs1 | mem_match_rs2;
+            assign integer_stall = ex_match_rs1 | ex_match_rs2 |
+                                   mem_match_rs1 | mem_match_rs2;
+            assign fp_stall = fp_ex_match | fp_mem_match;
         end else begin : g_none
             // baseline: any matches are bad
-            assign stall = ex_match_rs1 | ex_match_rs2 |
-                           mem_match_rs1 | mem_match_rs2 |
-                           wb_match_rs1 | wb_match_rs2;
+            assign integer_stall = ex_match_rs1 | ex_match_rs2 |
+                                   mem_match_rs1 | mem_match_rs2 |
+                                   wb_match_rs1 | wb_match_rs2;
+            assign fp_stall = fp_ex_match | fp_mem_match | fp_wb_match;
         end
     endgenerate
 
+    assign stall = integer_stall | fp_stall;
     assign o_if_hold = stall & ~flush;
     assign o_id_nop  = stall | flush;
 endmodule // hazardctrl

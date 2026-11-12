@@ -110,7 +110,7 @@ module decoder (
                 output wire        o_pc_sel
                 );
 
-    wire [7:0] opcode = i_inst[6:0];
+    wire [6:0] opcode = i_inst[6:0];
     wire [2:0] func3 = i_inst[14:12];
     wire [6:0] func7 = i_inst[31:25];
     wire [4:0] rs2_field = i_inst[24:20];
@@ -137,6 +137,7 @@ module decoder (
     wire is_nmadd     = (opcode == 7'b1001111);
 
     wire is_fused     = is_madd | is_msub | is_nmsub | is_nmadd;
+    wire int_fp_result;
 
     wire is_mext      = is_arr && (func7 == 7'b0000001);
     assign o_mext = is_mext;
@@ -329,7 +330,7 @@ module decoder (
           (func7 != 7'b1110000) &&
           (func7 != 7'b1100000));
 
-    wire int_fp_result =
+    assign int_fp_result =
          is_op_fp &&
          (((func7 == 7'b1010000)) ||
           ((func7 == 7'b1110000)) ||

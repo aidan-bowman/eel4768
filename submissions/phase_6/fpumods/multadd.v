@@ -291,26 +291,23 @@ module fpu_multadd (
 
     wire [26:0] aligned_product;
     wire [26:0] aligned_c;
+    wire [26:0] aligned_smaller_jammed;
+
+    // Preserve every bit shifted below the GRS field in the sticky position.
+    assign aligned_smaller_jammed =
+        {aligned_smaller[26:1], aligned_smaller[0] | aligned_sticky};
 
     assign aligned_product = product_is_larger
-                           ? product_ext : aligned_smaller;
+                           ? product_ext : aligned_smaller_jammed;
 
     assign aligned_c = product_is_larger
-                     ? aligned_smaller : c_ext;
+                     ? aligned_smaller_jammed : c_ext;
 
     wire [26:0] product_operand;
     wire [26:0] c_operand;
 
     assign product_operand = aligned_product;
     assign c_operand = aligned_c;
-
-    wire [2:0] aligned_grs;
-
-    assign aligned_grs = product_is_larger
-                       ? {c_operand[2], c_operand[1],
-                          c_operand[0] | aligned_sticky}
-                       : {product_operand[2], product_operand[1],
-                          product_operand[0] | aligned_sticky};
 
     // ------------------------------------------------------------
     // Add/subtract aligned significands
@@ -435,9 +432,12 @@ module fpu_multadd (
                 ? exp2 - 10'sd1 : exp2;
 
     wire [26:0] normalized_sig;
+    wire [26:0] normalized_sig_raw;
     wire signed [9:0] normalized_exp;
 
-    assign normalized_sig = left1;
+    assign normalized_sig_raw = left1;
+    assign normalized_sig = {normalized_sig_raw[26:1],
+                             normalized_sig_raw[0] | norm_sticky_initial};
     assign normalized_exp = exp1;
 
     // ------------------------------------------------------------
