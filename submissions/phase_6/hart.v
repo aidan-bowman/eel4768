@@ -574,7 +574,7 @@ module hart
             id_ex_rd_sel          <= rd_sel;
             id_ex_legal           <= legal;
             id_ex_halt            <= halt;
-            id_ex_trap            <= trap;
+            id_ex_trap            <= !legal;
             
             id_ex_frs1_data       <= frs1_data;
             id_ex_frs2_data       <= frs2_data;
