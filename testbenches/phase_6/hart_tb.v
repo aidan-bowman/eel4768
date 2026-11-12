@@ -179,7 +179,8 @@ module hart_tb;
         if (!rst && dut.ex_mem_pc == 32'h0041BC0C && !dut.cache_hold)
             $display("FMA EXMEM: inst=%08x result=%08x destination=f%0d write_enable=%b",
                      dut.ex_mem_inst, dut.ex_mem_fp_rdata,
-                     dut.ex_mem_frd, dut.ex_mem_frd_en);    
+                     dut.ex_mem_frd, dut.ex_mem_frd_en); 
+                if (!rst && dut.id_ex_inst == 32'hb9ac15c7)   
     end
 
     initial begin
@@ -200,10 +201,6 @@ module hart_tb;
             @(posedge clk);
             cycles = cycles + 1;
             if (retire_valid) begin
-                               if (retire_pc == 32'h0041BC0C)
-                    $display("FMA RETIRE: destination=f%0d write_enable=%b data=%08x",
-                             retire_frd_waddr, retire_frd_wen,
-                             retire_frd_wdata);
                retired = retired + 1;
                 if (retire_pc == 32'h0040db4c)
                     $display("FSW DEBUG: frs2=f%0d data=%08x dmem_wen=%b addr=%08x data=%08x",
