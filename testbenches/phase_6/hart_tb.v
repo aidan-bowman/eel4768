@@ -168,6 +168,18 @@ module hart_tb;
                      dut.ex_mem_pc, dut.ex_mem_inst, dut.id_ex_inst, dut.id_ex_trap,
                      dut.fpu_rm_trap, dut.dmem_byte_addr, dut.ex_mem_memalign,
                      dut.ex_mem_memread, dut.ex_mem_memwrite, dut.dmem_misaligned);
+                    // Trace the FMA result through the execute and memory stages.
+        if (!rst && dut.id_ex_pc == 32'h0041BC0C && !dut.cache_hold)
+            $display("FMA EXEC: operands=%08x * %08x + %08x result=%08x intermediate=%h busy=%b valid=%b ready=%b",
+                     dut.id_ex_frs1_data, dut.id_ex_frs2_data,
+                     dut.id_ex_frs3_data, dut.fpu_fp_res,
+                     dut.fpu.math_intermediate, dut.fpu_busy,
+                     dut.fpu.math_valid, dut.fpu.math_unit_ready);
+
+        if (!rst && dut.ex_mem_pc == 32'h0041BC0C && !dut.cache_hold)
+            $display("FMA EXMEM: inst=%08x result=%08x destination=f%0d write_enable=%b",
+                     dut.ex_mem_inst, dut.ex_mem_fp_rdata,
+                     dut.ex_mem_frd, dut.ex_mem_frd_en);    
     end
 
     initial begin
@@ -188,7 +200,11 @@ module hart_tb;
             @(posedge clk);
             cycles = cycles + 1;
             if (retire_valid) begin
-                retired = retired + 1;
+                               if (retire_pc == 32'h0041BC0C)
+                    $display("FMA RETIRE: destination=f%0d write_enable=%b data=%08x",
+                             retire_frd_waddr, retire_frd_wen,
+                             retire_frd_wdata);
+               retired = retired + 1;
                 if (retire_pc == 32'h0040db4c)
                     $display("FSW DEBUG: frs2=f%0d data=%08x dmem_wen=%b addr=%08x data=%08x",
                              retire_frs2_raddr, retire_frs2_rdata, retire_dmem_wen,
