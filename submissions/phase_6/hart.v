@@ -188,6 +188,7 @@ module hart
     reg [31:0] if_id_pc;
     reg [31:0] if_id_nextpc; // for retire interface
     reg [31:0] if_id_inst;
+    reg if_id_valid;
 
     always @(posedge i_clk) begin
         if (i_rst) begin
@@ -195,6 +196,7 @@ module hart
             if_id_pc   <= 32'b0;
             if_id_inst <= 32'b0;
             if_id_nextpc <= 32'b0;
+                if_id_valid <= 1'b0;
         end else if (if_hold || cache_hold) begin
             // don't update anything
         end else begin
@@ -205,6 +207,7 @@ module hart
                           32'h00000013 : icache_rdata;
             pc         <= next_pc;
             if_id_nextpc <= next_pc;
+            if_id_valid <= 1'b1;
         end
     end
 
@@ -572,9 +575,9 @@ module hart
             id_ex_memw            <= memw;
             id_ex_memu            <= memu;
             id_ex_rd_sel          <= rd_sel;
-            id_ex_legal           <= legal;
-            id_ex_halt            <= halt;
-            id_ex_trap            <= !legal;
+            id_ex_legal <= if_id_valid && legal;
+            id_ex_halt  <= if_id_valid && halt;
+            id_ex_trap  <= if_id_valid && !legal;
             
             id_ex_frs1_data       <= frs1_data;
             id_ex_frs2_data       <= frs2_data;
