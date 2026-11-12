@@ -771,7 +771,6 @@ module hart
 	reg [31:0] ex_mem_pc;
 	reg [31:0] ex_mem_nextpc;
 	reg        ex_mem_valid;
-	reg [31:0] ex_mem_next_pc;
 	reg [31:0] ex_mem_inst;
 	reg [31:0] ex_mem_imm;
 	
@@ -850,7 +849,6 @@ module hart
         	// Hold all EX/MEM registers while the cache is waiting.
         end else begin
             ex_mem_alu_result  <= alu_result;
-            ex_mem_rs2_data    <= id_ex_rs2_data;
             ex_mem_pc          <= id_ex_pc;
 			ex_mem_nextpc      <= id_ex_nextpc;
 			ex_mem_inst        <= id_ex_inst;
@@ -913,8 +911,6 @@ module hart
                               (ex_mem_memalign[1] &&
                                (dmem_byte_addr[1] | dmem_byte_addr[0]))
                               );
-
-    // TODO: flw
 
     // ------------------------------------------------
     // MEM->MEM forwarding
@@ -1165,7 +1161,7 @@ module hart
         end else begin
             mem_wb_writeback_data <= writeback_data;
             mem_wb_pc             <= ex_mem_pc;
-			mem_wb_next_pc        <= ex_mem_next_pc;
+			mem_wb_next_pc        <= ex_mem_nextpc;
 			mem_wb_inst           <= ex_mem_inst;
     		mem_wb_rs1            <= ex_mem_rs1;
     		mem_wb_rs2            <= ex_mem_rs2;
@@ -1200,7 +1196,7 @@ module hart
     end // always @ (posedge i_clk)
 
     // retire interface
-    assign o_retire_valid = mem_wb_legal && !cache_hold;
+    assign o_retire_valid = (mem_wb_legal | mem_wb_trap) & !cache_hold;
       
     assign o_retire_trap = mem_wb_trap;
 	assign o_retire_next_pc = mem_wb_next_pc;
