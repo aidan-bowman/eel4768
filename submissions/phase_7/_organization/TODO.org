@@ -1,0 +1,59 @@
+#+TITLE: Comp Arch Phase 7
+#+STARTUP: OVERVIEW
+#+TODO: TODO(t) INPROG(i) WAITING(w) | DONE(d)
+
+* TODO hart.v
+For this phase, it will be easiest to write the entire thing from scratch and copy over what's needed.
+Since we're rewriting, may as well clean this up to make it more understandable
+** DONE copy portlist
+** TODO write rest of todos
+* TODO fetch.v
+instruction fetching
+IN ORDER!
+can be copied from phase_6 hart, but THIS SHOULD BE ITS OWN MODULE
+** TODO write portlist
+** TODO write rest of todos
+* TODO dispatch.v
+instruction decoding
+IN ORDER!
+also can be copied from phase_6 hart, but THIS SHOULD ALSO BE ITS OWN MODULE
+** TODO write portlist
+** TODO write rest of todos
+* TODO lsu.v
+load-store unit
+IN ORDER!
+memory stage from phase_6 hart, can also be copied
+** TODO write portlist
+** TODO write rest of todos
+* TODO rob.v
+reorder buffer
+NEW
+** TODO write portlist
+** TODO write rest of todos
+* TODO rs.v
+reservation station
+NEW
+** TODO write portlist
+** TODO write rest of todos
+* TODO rat.v
+register alias table
+NEW
+** TODO write portlist
+** TODO write rest of todos
+* TODO cdb_arb.v
+common data bus age arbitration
+NEW
+** TODO write portlist
+** TODO write rest of todos
+* TODO rob.v
+reorder buffer
+** TODO write portlist
+** TODO write rest of todos
+* TODO hart simulation TB
+** TODO write rest of todos
+* TODO riscv_fv.v TB
+formal verification
+TWO CREDITS!
+** TODO write rest of todos
+* WAITING Lint before submitting
+* WAITING check over implementation checklist
