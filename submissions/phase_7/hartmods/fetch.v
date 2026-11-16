@@ -21,15 +21,18 @@ module fetch
      input wire                    i_rst,
      
      // CPU
-     input wire                    i_stall,       // high when hazardctrl needs us to stall
-     output wire                   o_icachestall, // output high when icache is stalling
-     
-     input wire                    i_jump,        // high when we jump or branch
+     // hazard control
+     input wire                    i_stall, // high when hazardctrl needs us to stall
+     output wire                   o_stall, // output high when WE need to stall
+
+     input wire                    i_jump,  // high when we jump or branch
      input wire [31:0]             i_jumpaddr,
+     // to dispatch
      output reg [31:0]             o_pc,
      output reg [31:0]             o_instr,
-     output reg                    o_nop,         // high when this instruction is just a nop
+     output reg                    o_nop,   // high when this instruction is just a nop
      
+     // NOT CPU
      // imem
      output wire                   o_imem_rd,
      output wire [31:0]            o_imem_rd_addr,
@@ -106,6 +109,6 @@ module fetch
         end
     end
 
-    assign o_icachestall = icache_stall;
+    assign o_stall = icache_stall;
     
 endmodule

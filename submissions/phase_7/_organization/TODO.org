@@ -2,58 +2,124 @@
 #+STARTUP: OVERVIEW
 #+TODO: TODO(t) INPROG(i) WAITING(w) | DONE(d)
 
-* TODO hart.v
+* coding progress
+** TODO hart.v
 For this phase, it will be easiest to write the entire thing from scratch and copy over what's needed.
 Since we're rewriting, may as well clean this up to make it more understandable
-** DONE copy portlist
-** TODO write rest of todos
-* DONE fetch.v
+*** DONE copy portlist
+*** TODO write rest of todos
+** DONE fetch.v
 instruction fetching
 IN ORDER!
 can be copied from phase_6 hart, but THIS SHOULD BE ITS OWN MODULE
-** DONE write portlist
-** DONE everything else
-* TODO dispatch.v
+*** DONE write portlist
+*** DONE everything else
+** TODO dispatch.v
 instruction decoding
 IN ORDER!
 also can be copied from phase_6 hart, but THIS SHOULD ALSO BE ITS OWN MODULE
-** TODO write portlist
-** TODO write rest of todos
-* TODO lsu.v
+*** TODO write portlist
+*** TODO copy from phase_6 hart.v
+*** TODO clean up
+** TODO lsu.v
 load-store unit
 IN ORDER!
 memory stage from phase_6 hart, can also be copied
-** TODO write portlist
-** TODO write rest of todos
-* TODO rob.v
+*** TODO write portlist
+*** TODO write rest of todos
+** TODO rob.v
 reorder buffer
 NEW
-** TODO write portlist
-** TODO write rest of todos
-* TODO rs.v
+*** TODO write portlist
+*** TODO write rest of todos
+** TODO rs.v
 reservation station
 NEW
-** TODO write portlist
-** TODO write rest of todos
-* TODO rat.v
+*** TODO write portlist
+*** TODO write rest of todos
+** TODO rat.v
 register alias table
 NEW
-** TODO write portlist
-** TODO write rest of todos
-* TODO cdb_arb.v
+*** TODO write portlist
+*** TODO write rest of todos
+** TODO cdb.v
+*** TODO write portlist
+*** TODO write rest of todos
+** TODO cdb_arb.v
 common data bus age arbitration
 NEW
-** TODO write portlist
-** TODO write rest of todos
-* TODO rob.v
+*** TODO write portlist
+*** TODO write rest of todos
+** TODO rob.v
 reorder buffer
-** TODO write portlist
-** TODO write rest of todos
-* TODO hart simulation TB
-** TODO write rest of todos
-* TODO riscv_fv.v TB
+*** TODO write portlist
+*** TODO write rest of todos
+** TODO hart simulation TB
+*** TODO write rest of todos
+** TODO riscv_fv.v TB
 formal verification
 TWO CREDITS!
-** TODO write rest of todos
-* WAITING Lint before submitting
-* WAITING check over implementation checklist
+*** TODO write rest of todos
+** WAITING Lint before submitting
+** WAITING check over implementation checklist
+* implementation checklist
+** TODO Frontend / Phase 4 shell (hart)
+*** DONE PC, imem fetch
+*** DONE IF/ID barriers
+*** TODO decoder + imm
+*** TODO RF read at ID
+*** DONE RESET_ADDR
+*** TODO data base 0x10010000
+*** TODO id_hold freezes IF/ID (no nop inject)
+*** TODO fetch_stall injects nop when used
+*** TODO squash IF/ID on taken redirect
+*** TODO instantiate backend; consume taken / pc_jump / id_hold / fetch_stall
+** TODO Rename / Issue (ooo_core + rat/rob)
+*** TODO RAT for x1-x31
+*** TODO Single-issue into ROB
+*** TODO Operand resolves: RF / ROB done / CDB bypass / else Q-tag
+*** TODO Issue classes:
+- ALU -> ROB + ALU RS
+- FP  -> ROB + FP RS
+- mem -> ROB + LSU
+- legal br/jmp -> ROB + ALU RS (not done at issue)
+- ebreak/illegal -> ROB done at issue
+*** TODO Stall issue if ROB, ALU RS, FP RS, LSU full or while br/jmp is in-flight
+** TODO Execute / CDB (RS + glue)
+*** TODO oldest-ready RS dispatch
+*** TODO shared ALU
+*** TODO no same-cycle issue -> ALU
+*** TODO registred ALU CDB
+*** TODO br/jmp resolve on ALU path -> PC
+*** TODO jal/jalr link on CDB, but conditional branches write no rd
+*** TODO one CDB/cycle, age-arb in cdb_arb, wake RS/ROB/LSU, drive o_complete
+** TODO FP path + FPU
+*** TODO Include phase 6 fpu
+*** TODO dual FP path
+** TODO Memory / LSU
+*** TODO Include data cache
+*** TODO in-order queue - no mem RS / LSQ / store->load forward
+*** TODO hold request until cache is ready
+*** TODO cache miss does not freeze whole core
+*** TODO loads: cache read -> CDB
+*** TODO stores: cache write at commit
+*** TODO blocks o_mem_* and i_mem_* on hart.v
+*** TODO misaligned -> trap, no cache request or other side effect
+** TODO Commit / retire (ROB)
+*** TODO commit oldest when done
+*** TODO RF write at commit only
+*** TODO o_retire_* from ROB head
+*** TODO traps/halt
+*** TODO correct next_pc
+*** TODO rs*_rdata = operands used
+** TODO Formal Verification
+*** TODO OSS CAD Suite on PATH; source/fv/example/mutex/run.sh PASS (this checks toolcahin)
+*** TODO filled riscv.fv.v at submission root, instantiates cdb_arb / rat
+*** TODO at least 10 non-vacuous asserts under `ifdef FORMAL
+*** TODO source/fv/riscv/run.sh <submission> reports PASS
+** TODO Verify before submit
+*** TODO [ece552 validate -w] clean -- run via scripts/check_design.sh
+*** TODO self-check traces pass
+*** TODO OoO witness (COMPLETE) + branchy redirect OK
+*** TODO throughput CPI not much worse than staff
+*** TODO zip has all files and submitted!
