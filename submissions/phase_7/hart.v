@@ -154,7 +154,38 @@ module hart #(
     ,`RVFI_OUTPUTS,
 `endif
 );
+    
+    // TODO fill in unattached wires
+    fetch #(
+            .RESET_ADDR(RESET_ADDR),
+            .EVICT_POLICY(EVICT_POLICY),
+            .NUM_WAYS(NUM_WAYS),
+            .CACHE_SIZE(CACHE_SIZE),
+            .BLOCK_SIZE(BLOCK_SIZE),
+            .PREFETCH_EN(PREFETCH_EN)
+            .WRITE_ALLOCATE(WRITE_ALLOCATE),
+            )
+    fetch (
+           .i_clk(i_clk),
+           .i_rst(i_rst,
 
-// Write your code here.
+           //cpu
+           // hazard control
+           .i_stall(),
+           .o_stall(),
+
+           .i_jump(),
+           .i_jumpaddr(),
+           // to dispatch
+           .o_pc(),
+           .o_instr(),
+           .o_nop(),
+
+           // imem
+           .o_imem_rd(o_imem_rd),
+           .o_imem_rd_addr(o_imem_rd_addr),
+           .i_imem_valid(i_imem_valid),
+           .i_imem_rd_data(i_imem_rd_data)
+           );
 
 endmodule
