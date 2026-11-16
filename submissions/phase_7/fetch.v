@@ -20,15 +20,17 @@ module fetch
      input wire                    i_clk,
      input wire                    i_rst,
      
-     // to cpu
+     // CPU
      input wire                    i_stall,       // high when hazardctrl needs us to stall
-     input wire                    i_jump,        // high when we jump or branch
-     input wire [31:0]             i_jumpaddr,
-     input reg [31:0]              o_pc,
-     input reg [31:0]              o_instr,
      output wire                   o_icachestall, // output high when icache is stalling
      
-     // to memory
+     input wire                    i_jump,        // high when we jump or branch
+     input wire [31:0]             i_jumpaddr,
+     output reg [31:0]             o_pc,
+     output reg [31:0]             o_instr,
+     output reg                    o_nop,         // high when this instruction is just a nop
+     
+     // imem
      output wire                   o_imem_rd,
      output wire [31:0]            o_imem_rd_addr,
      input wire                    i_imem_valid,
@@ -95,10 +97,12 @@ module fetch
     always @(posedge i_clk) begin
         if (i_rst) begin
             o_pc    <= 32'b0;
-            o_instr <= NOP; // easier than having a valid bit
+            o_instr <= NOP;
+            o_nop <= 1'b1;
         end else if (!stalling) begin
             o_pc    <= pc;
             o_instr <= i_jump ? NOP : icache_rdata;
+            o_nop   <= i_jump ? 1'b1 : 1'b0;
         end
     end
 
