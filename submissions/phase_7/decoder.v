@@ -253,7 +253,7 @@ module decoder (
 
     assign o_rs1 = (is_arr | is_arr_imm | is_load |
                    is_store | is_branch | is_load_fp |
-                   is_store_fp)
+                   is_store_fp | is_jalr)
       ? i_inst[19:15] :
                   (is_op_fp &&
                    ((func7 == 7'b1101000) ||

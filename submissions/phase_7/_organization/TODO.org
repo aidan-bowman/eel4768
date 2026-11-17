@@ -14,13 +14,13 @@ IN ORDER!
 can be copied from phase_6 hart, but THIS SHOULD BE ITS OWN MODULE
 *** DONE write portlist
 *** DONE everything else
-** TODO dispatch.v
+** DONE dispatch.v
 instruction decoding
 IN ORDER!
 also can be copied from phase_6 hart, but THIS SHOULD ALSO BE ITS OWN MODULE
-*** TODO write portlist
-*** TODO copy from phase_6 hart.v
-*** TODO clean up
+*** DONE write portlist
+*** DONE copy from phase_6 hart.v
+*** DONE clean up
 ** TODO lsu.v
 load-store unit
 IN ORDER!
