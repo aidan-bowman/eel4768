@@ -155,6 +155,14 @@ module hart #(
 `endif
 );
     
+    // *******************************
+    // FETCH
+    // *******************************
+
+    wire fetch_pc;
+    wire fetch_instr;
+    wire fetch_nop;
+    
     // TODO fill in unattached wires
     fetch #(
             .RESET_ADDR(RESET_ADDR),
@@ -167,7 +175,7 @@ module hart #(
             )
     fetch (
            .i_clk(i_clk),
-           .i_rst(i_rst,
+           .i_rst(i_rst),
 
            //cpu
            // hazard control
@@ -177,9 +185,9 @@ module hart #(
            .i_jump(),
            .i_jumpaddr(),
            // to dispatch
-           .o_pc(),
-           .o_instr(),
-           .o_nop(),
+           .o_pc(fetch_pc),
+           .o_instr(fetch_instr),
+           .o_nop(fetch_nop),
 
            // imem
            .o_imem_rd(o_imem_rd),
@@ -187,5 +195,95 @@ module hart #(
            .i_imem_valid(i_imem_valid),
            .i_imem_rd_data(i_imem_rd_data)
            );
+    
+    // *******************************
+    // DISPATCH
+    // *******************************
+    
+    // TODO fill in unattached wires
+    dispatch #(
+               .BYPASS_EN(BYPASS_EN),
+               )
+    dispatch (
+              .i_clk(i_clk),
+              .i_rst(i_rst),
+        
+              //cpu
+              // hazard control
+              .i_stall(),
+              .o_stall(),
+
+              // from fetch
+              .i_pc(fetch_pc),
+              .i_instr(fetch_instr),
+              .i_nop(fetch_nop),
+        
+              // register file write, from commit
+              .i_rd_waddr(),
+              .i_rd_wdata(),
+              .i_frd_wen(),
+              .i_frd_waddr(),
+              .i_frd_wdata(),
+
+              // to reorder buffer (ID/EX)
+              .o_pc(),
+              .o_instr(),
+              .o_nop(),
+
+              .o_rs1_data(),
+              .o_rs2_data(),
+              .o_rs1(),
+              .o_rs2(),
+              .o_imm(),
+
+              .o_rd(),
+              .o_alu_opsel(),
+              .o_alu_sub(),
+              .o_alu_unsigned(),
+              .o_alu_arith(),
+              .o_mext(),
+
+              .o_op1_pc_sel(),
+              .o_op2_imm_sel(),
+
+              .o_branch(),
+              .o_branch_equal(),
+              .o_branch_unsigned(),
+              .o_branch_invert(),
+
+              .o_jump(),
+              .o_pc_alu_sel(),
+
+              .o_memread(),
+              .o_memwrite(),
+              .o_memalign(),
+              .o_memb(),
+              .o_memh(),
+              .o_memw(),
+              .o_memu(),
+
+              .o_rd_sel(),
+
+              .o_legal(),
+              .o_halt(),
+              .o_trap(),
+
+              .o_frs1_data(),
+              .o_frs2_data(),
+              .o_frs3_data(),
+
+              .o_frs1(),
+              .o_frs2(),
+              .o_frs3(),
+
+              .o_frs1_en(),
+              .o_frs2_en(),
+              .o_frs3_en(),
+
+              .o_fpu_en(),
+
+              .o_frd_en(),
+              .o_frd()
+              );
 
 endmodule
